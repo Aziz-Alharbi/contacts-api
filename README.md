@@ -1,7 +1,6 @@
 # contacts-api
 
-A Quarkus REST API for managing contacts and organizing them into contact groups.
-
+A Quarkus REST API for managing contacts and contact groups with validation, pagination, and filtering.
 
 ## Requirements
 
