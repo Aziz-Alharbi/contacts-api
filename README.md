@@ -1,18 +1,70 @@
 # contacts-api
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+A REST API for managing contacts and contact groups, built with Quarkus, MySQL, Panache, and Flyway.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+## Requirements
 
-## Running the application in dev mode
+- Java 21
+- Maven
+- MySQL 8
 
-You can run your application in dev mode that enables live coding using:
+## Database Setup
 
-```shell script
+Create a MySQL database:
+
+```sql
+CREATE DATABASE contacts_db;
+```
+
+Set the database password before running the application:
+
+```bash
+export DB_PASSWORD=your_mysql_password
+```
+
+Flyway migrations run automatically when the application starts and create the required database schema.
+
+## Running the Application
+
+Start the application in development mode:
+
+```bash
 mvn quarkus:dev
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+The API runs at:
+
+```text
+http://localhost:8080
+```
+
+## Testing the API
+
+Swagger UI can be used to test all API endpoints:
+
+```text
+http://localhost:8080/q/swagger-ui/
+```
+
+The exported OpenAPI contract is available at:
+
+```text
+docs/openapi.yaml
+```
+
+
+## Design Decisions
+
+- The application uses a layered architecture with separate resource, service, repository, entity, and DTO packages.
+- Resources handle HTTP requests and delegate business logic to services.
+- DTOs are used for API requests and responses so JPA entities are not exposed directly.
+- Panache repositories are used for database access.
+- Flyway manages the database schema, and Hibernate automatic schema generation is disabled.
+- A contact may belong to one contact group, and the group is optional.
+- Contact email and contact group name uniqueness are enforced by the database.
+- Contact and group listing supports pagination and filtering.
+- API errors are handled centrally and use a consistent `status`, `error`, and `message` response structure.
+- The API is versioned under `/api/v1`.
 
 ## Packaging and running the application
 
