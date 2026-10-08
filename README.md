@@ -1,6 +1,7 @@
 # contacts-api
 
-A REST API for managing contacts and contact groups, built with Quarkus, MySQL, Panache, and Flyway.
+A Quarkus REST API for managing contacts and organizing them into contact groups.
+
 
 ## Requirements
 
