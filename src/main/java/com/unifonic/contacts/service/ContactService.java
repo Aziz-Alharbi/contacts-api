@@ -55,13 +55,10 @@ public class ContactService {
         Contact contact = repository.findById(id);
 
         if (contact == null) {
-//            throw new ApiExceptionMapper(
-//                    "Contact not found with id: " + id
-//            );
             throw new ApiException(
                     404,
                     "Not Found",
-                    "Contact group not found with id: " + id
+                    "Contact not found with id: " + id
             );
 
         }
@@ -78,7 +75,6 @@ public class ContactService {
         contact.setEmail(request.getEmail());
         contact.setPhone(request.getPhone());
         contact.setOwner(request.getOwner());
-       // contact.setGroup(request.getGroupId());
 
         ContactGroup group = null;
 
@@ -113,7 +109,7 @@ public class ContactService {
             throw new ApiException(
                     404,
                     "Not Found",
-                    "Contact group not found with id: " + request.getGroupId()
+                    "Contact not found with id: " + id
             );
 
 
@@ -156,13 +152,13 @@ public class ContactService {
             throw new ApiException(
                     404,
                     "Not Found",
-                    "Contact group not found with id: " + id
+                    "Contact not found with id: " + id
             );
         }
     }
 
 
-    public List<ContactResponse> getByGroupId(Long groupId) {
+    public PagedResponse<ContactResponse> getByGroupId(Long groupId, int page, int size) {
 
         if (contactGroupRepository.findById(groupId) == null) {
             throw new ApiException(
@@ -173,10 +169,11 @@ public class ContactService {
         }
 
 
-        return repository.findByGroupId(groupId)
+        List<ContactResponse> items = repository.findPagedByGroupId(groupId, page, size)
                 .stream()
                 .map(this::toResponse)
                 .toList();
+        return new PagedResponse<>(items, page, size, repository.countByGroupId(groupId));
     }
 
 

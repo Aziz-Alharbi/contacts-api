@@ -80,5 +80,4 @@ public class ContactResponse {
 
 
 
-    // Generate getters and setters
 }

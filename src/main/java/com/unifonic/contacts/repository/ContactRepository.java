@@ -9,8 +9,12 @@ import java.util.List;
 @ApplicationScoped
 public class ContactRepository implements PanacheRepository<Contact> {
 
-    public List<Contact> findByGroupId(Long groupId) {
-        return list("group.id", groupId);
+    public List<Contact> findPagedByGroupId(Long groupId, int page, int size) {
+        return find("group.id", groupId).page(page, size).list();
+    }
+
+    public long countByGroupId(Long groupId) {
+        return count("group.id", groupId);
     }
 
     public List<Contact> findPaged(int page, int size) {

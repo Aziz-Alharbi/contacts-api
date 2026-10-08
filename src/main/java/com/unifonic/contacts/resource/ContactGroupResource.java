@@ -14,12 +14,13 @@ import com.unifonic.contacts.dto.ContactGroupResponse;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.UriInfo;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.headers.Header;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-import java.util.List;
-import java.util.Map;
 
 @Tag(
         name = "Contact Groups",
@@ -93,7 +94,8 @@ public class ContactGroupResource {
             description = "Creates a new group")
     @APIResponse(
             responseCode = "201",
-            description = "Group created successfully"
+            description = "Group created successfully",
+            headers = @Header(name = "Location", description = "URL of the created group")
     )
     @APIResponse(
             responseCode = "400",
@@ -103,10 +105,10 @@ public class ContactGroupResource {
             responseCode = "409",
             description = "Group name already exists"
     )
-    public Response create(@Valid ContactGroupRequest request) {
+    public Response create(@Valid ContactGroupRequest request, @Context UriInfo uriInfo) {
         ContactGroupResponse created = service.create(request);
 
-        return Response.status(Response.Status.CREATED)
+        return Response.created(uriInfo.getAbsolutePathBuilder().path(created.getId().toString()).build())
                 .entity(created)
                 .build();
     }
@@ -119,7 +121,7 @@ public class ContactGroupResource {
     @Operation(summary = "Update a group",
             description = "Updates an existing group")
     @APIResponse(
-            responseCode = "201",
+            responseCode = "200",
             description = "Group updated successfully"
     )
     @APIResponse(
@@ -148,7 +150,7 @@ public class ContactGroupResource {
     @Operation(summary = "Delete a group",
             description = "Deletes a group by its ID")
     @APIResponse(
-            responseCode = "200",
+            responseCode = "204",
             description = "Group deleted successfully"
     )
     @APIResponse(
@@ -158,11 +160,7 @@ public class ContactGroupResource {
     public Response delete(@PathParam("id") Long id) {
         service.delete(id);
 
-      //  return Response.noContent().build();
-
-        return Response.ok(
-                Map.of("message", "Contact group deleted successfully")
-        ).build();
+        return Response.noContent().build();
     }
 
 
@@ -178,11 +176,18 @@ public class ContactGroupResource {
             description = "Group contacts retrieved successfully"
     )
     @APIResponse(
+            responseCode = "400",
+            description = "Invalid pagination parameters"
+    )
+    @APIResponse(
             responseCode = "404",
             description = "Group not found"
     )
-    public List<ContactResponse> getContactByGroup(@PathParam("id") Long groupId) {
-        return contactservice.getByGroupId(groupId);
+    public PagedResponse<ContactResponse> getContactByGroup(
+            @PathParam("id") Long groupId,
+            @QueryParam("page") @DefaultValue("0") @Min(0) int page,
+            @QueryParam("size") @DefaultValue("10") @Min(1) @Max(100) int size) {
+        return contactservice.getByGroupId(groupId, page, size);
     }
 
 
