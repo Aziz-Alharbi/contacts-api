@@ -1,6 +1,5 @@
 package com.unifonic.contacts.resource;
 
-import com.unifonic.contacts.dto.ContactGroupResponse;
 import com.unifonic.contacts.dto.ContactRequest;
 import com.unifonic.contacts.dto.ContactResponse;
 import com.unifonic.contacts.dto.PagedResponse;
@@ -10,14 +9,15 @@ import jakarta.ws.rs.*;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.UriInfo;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.headers.Header;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Max;
 
-import java.util.List;
-import java.util.Map;
 
 @Tag(
         name = "Contacts",
@@ -89,7 +89,8 @@ public class ContactResource {
             description = "Creates a new contact")
     @APIResponse(
             responseCode = "201",
-            description = "Contact created successfully"
+            description = "Contact created successfully",
+            headers = @Header(name = "Location", description = "URL of the created contact")
     )
     @APIResponse(
             responseCode = "400",
@@ -103,10 +104,10 @@ public class ContactResource {
             responseCode = "409",
             description = "Contact email already exists"
     )
-    public Response create(@Valid ContactRequest request) {
+    public Response create(@Valid ContactRequest request, @Context UriInfo uriInfo) {
         ContactResponse created = service.create(request);
 
-        return Response.status(Response.Status.CREATED)
+        return Response.created(uriInfo.getAbsolutePathBuilder().path(created.getId().toString()).build())
                 .entity(created)
                 .build();
     }
@@ -148,7 +149,7 @@ public class ContactResource {
     @Operation(summary = "Delete a contact",
             description = "Deletes a contact by its ID")
     @APIResponse(
-            responseCode = "200",
+            responseCode = "204",
             description = "Contact deleted successfully"
     )
     @APIResponse(
@@ -158,9 +159,7 @@ public class ContactResource {
     public Response delete(@PathParam("id") Long id) {
         service.delete(id);
 
-        //  return Response.noContent().build();
-
-        return Response.ok(Map.of("message", "Contact deleted successfully")).build();
+        return Response.noContent().build();
     }
 
 

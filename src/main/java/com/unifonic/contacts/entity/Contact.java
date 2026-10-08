@@ -27,7 +27,7 @@ public class Contact {
     @Column(nullable = false, length = 100)
     private String owner;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id")
     private ContactGroup group;
 

@@ -22,7 +22,6 @@ public class ContactRequest {
     @NotBlank
     @Size(max = 100)
     private String owner;
-//    @Size(max = 100)
     private Long groupId;
 
 
@@ -75,5 +74,4 @@ public class ContactRequest {
     }
 
 
-    // Generate getters and setters
 }
