@@ -5,6 +5,8 @@ import com.unifonic.contacts.dto.PagedResponse;
 import com.unifonic.contacts.service.ContactGroupService;
 import com.unifonic.contacts.service.ContactService;
 import jakarta.inject.Inject;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.ws.rs.*;
 
 import com.unifonic.contacts.dto.ContactGroupRequest;
@@ -64,9 +66,20 @@ public class ContactGroupResource {
             description = "Invalid pagination parameters"
     )
     public PagedResponse<ContactGroupResponse> getAll(
-            @QueryParam("page") @DefaultValue("0") int page,
-            @QueryParam("size") @DefaultValue("10") int size,
-            @QueryParam("name") String name) {
+            @QueryParam("page")
+            @DefaultValue("0")
+            @Min(0)
+            int page,
+
+            @QueryParam("size")
+            @DefaultValue("10")
+            @Min(1)
+            @Max(100)
+            int size,
+
+            @QueryParam("name")
+            String name
+    ) {
 
         return service.getAll(page, size, name);
     }
