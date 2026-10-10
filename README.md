@@ -2,6 +2,22 @@
 
 A Quarkus REST API for managing contacts and contact groups with validation, pagination, and filtering.
 
+## Project structure
+
+The root `pom.xml` is the parent and reactor POM. It manages shared Java, dependency, and plugin settings.
+
+- `contacts-api/` contains the existing Quarkus application and Dockerfiles.
+- `docs/openapi.yaml` remains the exported API contract.
+- A future `contacts-reporter/` module can inherit the parent settings and be added to the root modules list.
+
+Run `mvn verify` from the repository root to build all modules. To build only the API and its parent, use `mvn -pl contacts-api -am verify`.
+
+Docker builds use the module as their context:
+
+```bash
+docker build -f contacts-api/src/main/docker/Dockerfile.jvm -t contacts-api contacts-api
+```
+
 ## Requirements
 
 - Java 21
@@ -29,7 +45,7 @@ Flyway migrations run automatically when the application starts and create the r
 Start the application in development mode:
 
 ```bash
-mvn quarkus:dev
+mvn -pl contacts-api quarkus:dev
 ```
 
 The API runs at:
@@ -74,10 +90,10 @@ The application can be packaged using:
 mvn package
 ```
 
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
+It produces the `quarkus-run.jar` file in the `contacts-api/target/quarkus-app/` directory.
+Be aware that it’s not an _über-jar_ as the dependencies are copied into the `contacts-api/target/quarkus-app/lib/` directory.
 
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
+The application is now runnable using `java -jar contacts-api/target/quarkus-app/quarkus-run.jar`.
 
 If you want to build an _über-jar_, execute the following command:
 
@@ -85,7 +101,7 @@ If you want to build an _über-jar_, execute the following command:
 mvn package -Dquarkus.package.jar.type=uber-jar
 ```
 
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
+The application, packaged as an _über-jar_, is now runnable using `java -jar contacts-api/target/*-runner.jar`.
 
 ## Creating a native executable
 
@@ -101,6 +117,6 @@ Or, if you don't have GraalVM installed, you can run the native executable build
 mvn package -Dnative -Dquarkus.native.container-build=true
 ```
 
-You can then execute your native executable with: `./target/contacts-api-1.0.0-SNAPSHOT-runner`
+You can then execute your native executable with: `./contacts-api/target/contacts-api-1.0.0-SNAPSHOT-runner`
 
 If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
