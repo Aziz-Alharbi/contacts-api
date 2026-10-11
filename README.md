@@ -24,6 +24,10 @@ docker build -f contacts-api/src/main/docker/Dockerfile.jvm -t contacts-api cont
 - Maven
 - MySQL 8
 
+## Identity provider
+
+The Docker-based Keycloak setup, realm configuration, users, service account, and JWT examples are documented in [identity/README.md](identity/README.md).
+
 ## Database Setup
 
 Create a MySQL database:

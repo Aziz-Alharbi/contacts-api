@@ -43,3 +43,8 @@ nb-configuration.xml
 /.quarkus/cli/plugins/
 # TLS Certificates
 .certs/
+
+# Identity exports and bearer tokens
+identity/exports/
+*.jwt
+__pycache__/
