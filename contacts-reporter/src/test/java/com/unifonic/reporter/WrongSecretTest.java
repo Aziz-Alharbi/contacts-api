@@ -27,6 +27,8 @@ class WrongSecretTest {
             assertTrue(ReporterUpstream.tokenRequests.get() > 0);
             assertFalse(response.body().contains("incorrect-fixture-secret"));
             assertFalse(response.body().contains("invalid_client"));
+            assertFalse(response.body().contains("fixture-token"));
+            assertFalse(response.body().contains("contactCount"));
         }
     }
 }

@@ -42,24 +42,27 @@ class ReporterTest {
         assertEquals(200, response.statusCode());
         assertTrue(response.body().contains("\"contactCount\":0"));
     }
-    @Test void upstreamAuthenticationAuthorizationAndFailuresAreSanitized() throws Exception {
-        for (int status : new int[]{401, 403, 500}) {
-            ReporterUpstream.apiStatus.set(status);
-            var response = report();
-            assertEquals(502, response.statusCode(), response.body());
-            assertFalse(response.body().contains("private-upstream-error"));
-            assertFalse(response.body().contains("fixture-secret"));
-        }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints={401,403,500})
+    void upstreamAuthenticationAuthorizationAndFailuresAreSanitized(int status) throws Exception {
+        ReporterUpstream.apiStatus.set(status);
+        var response = report();
+        assertEquals(502, response.statusCode(), response.body());
+        assertFalse(response.body().contains("private-upstream-error"));
+        assertFalse(response.body().contains("fixture-secret"));
+        assertFalse(response.body().contains("fixture-token"));
+        assertFalse(response.body().contains("contactCount"));
     }
-    @Test void rejectsMalformedAndInconsistentPages() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"{}", "{\"total\":-1}",
+        "{\"items\":[],\"page\":0,\"size\":1,\"total\":5}",
+        "{\"items\":[],\"page\":0,\"size\":1,\"total\":\"0\"}", "invalid-json"})
+    void rejectsMalformedAndInconsistentPages(String body) throws Exception {
         ReporterUpstream.apiStatus.set(200);
-        for (String body : new String[]{"{}", "{\"total\":-1}",
-                "{\"items\":[],\"page\":0,\"size\":1,\"total\":5}",
-                "{\"items\":[],\"page\":0,\"size\":1,\"total\":\"0\"}", "invalid-json"}) {
-            ReporterUpstream.page = body;
-            var response = report();
-            assertTrue(response.statusCode() == 502 || response.statusCode() == 503, response.body());
-            assertFalse(response.body().contains("fixture-token"));
-        }
+        ReporterUpstream.page=body;
+        var response=report();
+        assertTrue(response.statusCode()==502 || response.statusCode()==503,response.body());
+        assertFalse(response.body().contains("fixture-token"));
+        assertFalse(response.body().contains("contactCount"));
     }
 }

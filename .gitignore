@@ -50,5 +50,3 @@ identity/exports/
 
 __pycache__/
 *.pyc
-
-/contacts-api/src/test/

@@ -56,8 +56,8 @@ Swagger UI's Authorize button accepts the bearer token. Authentication happens i
 mvn verify
 ```
 
-Security tests start a local OIDC discovery/JWKS server with freshly generated RSA keys and an in-memory H2 database in MySQL compatibility mode. They send actual signed JWTs over HTTP through Quarkus OIDC, not mocked identities. Tests cover missing/invalid tokens, expired tokens, wrong issuer/audience/signature/subject, insufficient roles, admin group permissions, ownership spoofing, cross-user CRUD, admin contact isolation, and owner-filtered group pagination.
+Security tests start a local JWKS server with an explicit test issuer with freshly generated RSA keys and an in-memory H2 database in MySQL compatibility mode. They send actual signed JWTs over HTTP through Quarkus OIDC, not mocked identities. Tests cover missing/invalid tokens, expired tokens, wrong issuer/audience/signature and blank subject, insufficient roles, admin group permissions, ownership spoofing, cross-user CRUD, admin contact isolation, and owner-filtered group pagination.
 
-A local smoke test also verified actual Keycloak discovery, reporter token claims, and the packaged API accepting that signed token, rejecting missing JWTs (401), and rejecting user-role group writes (403). Database access was disabled for this live smoke test. Full MySQL-backed CRUD still needs deployment verification. No test keys, tokens, or databases are used by the production profile.
+A local smoke test also verified actual Keycloak discovery, reporter token claims, and the packaged API accepting that signed token, rejecting missing JWTs (401), and rejecting user-role group writes (403). Live integration checks also verified real CRUD and derived reporting with an isolated MySQL database. No test keys, tokens, or databases are used by the production profile.
 
 References: [Quarkus bearer authentication](https://quarkus.io/guides/security-oidc-bearer-token-authentication/) and [OIDC claim validation configuration](https://quarkus.io/guides/security-oidc-expanded-configuration/).
