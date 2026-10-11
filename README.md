@@ -128,3 +128,7 @@ mvn package -Dnative -Dquarkus.native.container-build=true
 You can then execute your native executable with: `./contacts-api/target/contacts-api-1.0.0-SNAPSHOT-runner`
 
 If you want to learn more about building native executables, please consult <https://quarkus.io/guides/maven-tooling>.
+
+## Automated tests and coverage
+
+Run `mvn clean verify` to execute API/Reporter tests, generate per-module JaCoCo reports, and enforce 80% line coverage for business logic and endpoints. See [testing and coverage](docs/testing-and-coverage.md) for scope, report paths, and mutation verification.

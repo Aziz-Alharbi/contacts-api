@@ -6,7 +6,7 @@ sys.path.insert(0,str(root/'identity/scripts'))
 from get_token import local_env, post
 DOCKER=shutil.which('docker') or '/Applications/Docker.app/Contents/Resources/bin/docker'
 if not Path(DOCKER).is_file(): raise SystemExit('Install Docker and start its daemon before running this check.')
-name='contacts-phase4-mysql-'+uuid.uuid4().hex[:8]
+name='contacts-e2e-mysql-'+uuid.uuid4().hex[:8]
 password=secrets.token_urlsafe(32)
 env=dict(os.environ, **local_env()); env['MYSQL_ROOT_PASSWORD']=password
 env['PATH']=str(Path(DOCKER).parent)+os.pathsep+env.get('PATH','')
@@ -23,7 +23,7 @@ def http(url,token=None,data=None):
 
 def start(module,port,variables):
     runenv=dict(env,**variables)
-    log=open('/tmp/'+module+'-phase4-'+str(port)+'.log','w');files.append(log)
+    log=open('/tmp/'+module+'-e2e-'+str(port)+'.log','w');files.append(log)
     process=subprocess.Popen(['java','-Dquarkus.http.port='+str(port),'-jar',str(root/module/'target/quarkus-app/quarkus-run.jar')],env=runenv,stdout=log,stderr=subprocess.STDOUT)
     processes.append(process)
     for attempt in range(40):
@@ -53,7 +53,7 @@ try:
     api='http://localhost:18080/api/v1'
     assert http(api+'/contacts')[0]==401
     for index in range(2):
-        status,_=http(api+'/contacts',token,{'firstName':'Reporter','lastName':'Test','email':f'phase4-{index}@example.test'})
+        status,_=http(api+'/contacts',token,{'firstName':'Reporter','lastName':'Test','email':f'reporter-e2e-{index}@example.test'})
         assert status==201, status
     assert http(api+'/groups',token,{'name':'forbidden-test'})[0]==403
     start('contacts-reporter',18082,{'CONTACTS_API_URL':'http://localhost:18080'})

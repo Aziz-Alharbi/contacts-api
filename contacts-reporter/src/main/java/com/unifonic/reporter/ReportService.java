@@ -39,8 +39,8 @@ public class ReportService {
         JsonNode total = page.get("total"), items = page.get("items");
         return total != null && total.isIntegralNumber() && total.canConvertToLong() && total.longValue() >= 0
                 && items != null && items.isArray() && items.size() <= 1
-                && page.path("page").isIntegralNumber() && page.path("page").asInt(-1) == 0
-                && page.path("size").isIntegralNumber() && page.path("size").asInt(-1) == 1
+                && page.path("page").isIntegralNumber() && page.path("page").canConvertToInt() && page.path("page").asInt(-1) == 0
+                && page.path("size").isIntegralNumber() && page.path("size").canConvertToInt() && page.path("size").asInt(-1) == 1
                 && ((total.longValue() == 0 && items.isEmpty()) || (total.longValue() > 0 && items.size() == 1));
     }
 

@@ -20,6 +20,8 @@
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.40.1</quarkus.platform.version>
         <skipITs>true</skipITs>
+        <jacoco.version>0.8.15</jacoco.version>
+        <coverage.minimum>0.80</coverage.minimum>
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
     </properties>
 
@@ -38,6 +40,70 @@
     <build>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <version>3.2.0</version>
+                    <executions>
+                        <execution>
+                            <id>reset-coverage</id><phase>initialize</phase><goals><goal>run</goal></goals>
+                            <configuration><target><delete file="${project.build.directory}/jacoco-quarkus.exec"/></target></configuration>
+                        </execution>
+                        <execution>
+                            <id>require-coverage-data</id><phase>verify</phase><goals><goal>run</goal></goals>
+                            <configuration><target>
+                                <available file="${project.build.directory}/jacoco-quarkus.exec" property="coverage.data.present"/>
+                                <fail unless="coverage.data.present" message="Coverage data is missing; run the tests before verify."/>
+                            </target></configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco.version}</version>
+                    <configuration>
+                        <dataFile>${project.build.directory}/jacoco-quarkus.exec</dataFile>
+                        <includes>
+                            <include>com/unifonic/contacts/service/**/*.class</include>
+                            <include>com/unifonic/contacts/resource/**/*.class</include>
+                            <include>com/unifonic/reporter/ReportService*.class</include>
+                            <include>com/unifonic/reporter/ReportResource.class</include>
+                        </includes>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>coverage-agent</id>
+                            <goals><goal>prepare-agent</goal></goals>
+                            <configuration>
+                                <exclClassLoaders>*QuarkusClassLoader</exclClassLoaders>
+                                <!-- Agent patterns are runtime class names, not report .class paths. -->
+                                <includes combine.self="override"><include>*</include></includes>
+                                <destFile>${project.build.directory}/jacoco-quarkus.exec</destFile>
+                                <append>true</append>
+                            </configuration>
+                        </execution>
+                        <execution>
+                            <id>coverage-report</id>
+                            <phase>verify</phase>
+                            <goals><goal>report</goal></goals>
+                            <configuration><outputDirectory>${project.build.directory}/jacoco-report</outputDirectory></configuration>
+                        </execution>
+                        <execution>
+                            <id>coverage-check</id>
+                            <phase>verify</phase>
+                            <goals><goal>check</goal></goals>
+                            <configuration>
+                                <rules><rule>
+                                    <element>CLASS</element>
+                                    <limits><limit>
+                                        <counter>LINE</counter><value>COVEREDRATIO</value>
+                                        <minimum>${coverage.minimum}</minimum>
+                                    </limit></limits>
+                                </rule></rules>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
                 <plugin>
                     <groupId>${quarkus.platform.group-id}</groupId>
                     <artifactId>quarkus-maven-plugin</artifactId>
@@ -59,6 +125,8 @@
                         <systemPropertyVariables>
                             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                             <maven.home>${maven.home}</maven.home>
+                            <quarkus.jacoco.reuse-data-file>true</quarkus.jacoco.reuse-data-file>
+                            <quarkus.jacoco.report>false</quarkus.jacoco.report>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>
