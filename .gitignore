@@ -47,4 +47,8 @@ nb-configuration.xml
 # Identity exports and bearer tokens
 identity/exports/
 *.jwt
+
 __pycache__/
+*.pyc
+
+/contacts-api/src/test/

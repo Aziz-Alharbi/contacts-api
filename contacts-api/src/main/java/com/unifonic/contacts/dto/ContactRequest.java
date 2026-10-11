@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties("owner")
 public class ContactRequest {
 
 
@@ -19,9 +20,6 @@ public class ContactRequest {
     private String email;
     @Size(max = 50)
     private String phone;
-    @NotBlank
-    @Size(max = 100)
-    private String owner;
     private Long groupId;
 
 
@@ -55,14 +53,6 @@ public class ContactRequest {
 
     public void setPhone(String phone) {
         this.phone = phone;
-    }
-
-    public String getOwner() {
-        return owner;
-    }
-
-    public void setOwner(String owner) {
-        this.owner = owner;
     }
 
     public Long getGroupId() {

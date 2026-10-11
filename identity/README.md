@@ -69,7 +69,7 @@ To save a token to a new file readable only by your user:
 python3 identity/scripts/get_token.py reporter --save /tmp/contacts-reporter.jwt
 ```
 
-A future reporter can send it using `Authorization: Bearer <access_token>`. **The current API does not yet validate bearer tokens or enforce these roles.** This phase sets up the identity provider and token issuance; API OIDC integration and its read/write access rules are a separate implementation step.
+A future reporter can send it using `Authorization: Bearer <access_token>`. The API now validates bearer JWTs and enforces roles and subject-based contact ownership. See [API security](../docs/security.md). The reporter can access only contacts owned by its own service-account subject.
 
 ## Reproduce and export the configuration
 
