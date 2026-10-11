@@ -8,7 +8,7 @@ The root `pom.xml` is the parent and reactor POM. It manages shared Java, depend
 
 - `contacts-api/` contains the existing Quarkus application and Dockerfiles.
 - `docs/openapi.yaml` remains the exported API contract.
-- A future `contacts-reporter/` module can inherit the parent settings and be added to the root modules list.
+- `contacts-reporter/` is the independent, database-free reporting application. See [reporter setup](contacts-reporter/README.md) for Client Credentials, the contact count endpoint, and failure scenarios.
 
 Run `mvn verify` from the repository root to build all modules. To build only the API and its parent, use `mvn -pl contacts-api -am verify`.
 
