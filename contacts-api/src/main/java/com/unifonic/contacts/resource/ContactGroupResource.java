@@ -5,6 +5,7 @@ import com.unifonic.contacts.dto.PagedResponse;
 import com.unifonic.contacts.service.ContactGroupService;
 import com.unifonic.contacts.service.ContactService;
 import jakarta.inject.Inject;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.ws.rs.*;
@@ -20,6 +21,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.headers.Header;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 
 
 @Tag(
@@ -27,6 +29,10 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
         description = "Operations for managing groups"
 )
 @Path("/api/v1/groups")
+@SecurityRequirement(name = "bearerAuth")
+@APIResponse(responseCode = "401", description = "Missing or invalid JWT")
+@APIResponse(responseCode = "403", description = "Insufficient role")
+@RolesAllowed({"user", "admin"})
 public class ContactGroupResource {
 
     @Inject
@@ -86,6 +92,7 @@ public class ContactGroupResource {
     }
 
 
+    @RolesAllowed("admin")
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
@@ -114,6 +121,7 @@ public class ContactGroupResource {
     }
 
 
+    @RolesAllowed("admin")
     @PUT
     @Path("/{id}")
     @Consumes(MediaType.APPLICATION_JSON)
@@ -145,6 +153,7 @@ public class ContactGroupResource {
 
 
 
+    @RolesAllowed("admin")
     @DELETE
     @Path("/{id}")
     @Operation(summary = "Delete a group",

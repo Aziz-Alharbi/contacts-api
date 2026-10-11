@@ -5,6 +5,7 @@ import com.unifonic.contacts.exception.ApiException;
 import com.unifonic.contacts.repository.ContactGroupRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.annotation.security.RolesAllowed;
 import com.unifonic.contacts.dto.ContactGroupRequest;
 import com.unifonic.contacts.dto.ContactGroupResponse;
 import com.unifonic.contacts.entity.ContactGroup;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @ApplicationScoped
+@RolesAllowed({"user", "admin"})
 public class ContactGroupService {
 
     @Inject
@@ -59,6 +61,7 @@ public class ContactGroupService {
         return toResponse(group);
     }
 
+    @RolesAllowed("admin")
     @Transactional
     public ContactGroupResponse create(ContactGroupRequest request) {
         ContactGroup group = new ContactGroup();
@@ -72,6 +75,7 @@ public class ContactGroupService {
         return toResponse(group);
     }
 
+    @RolesAllowed("admin")
     @Transactional
     public ContactGroupResponse update(Long id, ContactGroupRequest request) {
         ContactGroup group = repository.findById(id);
@@ -92,6 +96,7 @@ public class ContactGroupService {
     }
 
 
+    @RolesAllowed("admin")
     @Transactional
     public void delete(Long id) {
         boolean deleted = repository.deleteById(id);

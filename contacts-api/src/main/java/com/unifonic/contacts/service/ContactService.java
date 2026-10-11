@@ -9,17 +9,25 @@ import com.unifonic.contacts.repository.ContactGroupRepository;
 import com.unifonic.contacts.repository.ContactRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.NotAuthorizedException;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import jakarta.transaction.Transactional;
 import com.unifonic.contacts.entity.ContactGroup;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @ApplicationScoped
+@RolesAllowed({"user", "admin"})
 public class ContactService {
 
 
     @Inject
     ContactRepository repository;
+
+    @Inject
+    JsonWebToken token;
 
     @Inject
     ContactGroupRepository contactGroupRepository;
@@ -32,16 +40,12 @@ public class ContactService {
             int size,
             String owner) {
 
-        List<Contact> contacts;
-        long total;
-
-        if (owner != null && !owner.isBlank()) {
-            contacts = repository.findPagedByOwner(owner, page, size);
-            total = repository.countByOwner(owner);
-        } else {
-            contacts = repository.findPaged(page, size);
-            total = repository.countAll();
+        String subject = currentSubject();
+        if (owner != null && !owner.isBlank() && !subject.equals(owner)) {
+            throw new ForbiddenException("Cannot query another owner's contacts");
         }
+        List<Contact> contacts = repository.findPagedByOwner(subject, page, size);
+        long total = repository.countByOwner(subject);
 
         List<ContactResponse> items = contacts.stream()
                 .map(this::toResponse)
@@ -63,6 +67,7 @@ public class ContactService {
 
         }
 
+        requireOwnership(contact);
         return toResponse(contact);
     }
 
@@ -74,7 +79,7 @@ public class ContactService {
         contact.setLastName(request.getLastName());
         contact.setEmail(request.getEmail());
         contact.setPhone(request.getPhone());
-        contact.setOwner(request.getOwner());
+        contact.setOwner(currentSubject());
 
         ContactGroup group = null;
 
@@ -116,11 +121,12 @@ public class ContactService {
 
         }
 
+        requireOwnership(contact);
+
         contact.setFirstName(request.getFirstName());
         contact.setLastName(request.getLastName());
         contact.setEmail(request.getEmail());
         contact.setPhone(request.getPhone());
-        contact.setOwner(request.getOwner());
 
 
         ContactGroup group = null;
@@ -146,15 +152,12 @@ public class ContactService {
 
     @Transactional
     public void delete(Long id) {
-        boolean deleted = repository.deleteById(id);
-
-        if (!deleted) {
-            throw new ApiException(
-                    404,
-                    "Not Found",
-                    "Contact not found with id: " + id
-            );
+        Contact contact = repository.findById(id);
+        if (contact == null) {
+            throw new ApiException(404, "Not Found", "Contact not found with id: " + id);
         }
+        requireOwnership(contact);
+        repository.delete(contact);
     }
 
 
@@ -169,13 +172,28 @@ public class ContactService {
         }
 
 
-        List<ContactResponse> items = repository.findPagedByGroupId(groupId, page, size)
+        String subject = currentSubject();
+        List<ContactResponse> items = repository.findPagedByGroupIdAndOwner(groupId, subject, page, size)
                 .stream()
                 .map(this::toResponse)
                 .toList();
-        return new PagedResponse<>(items, page, size, repository.countByGroupId(groupId));
+        return new PagedResponse<>(items, page, size, repository.countByGroupIdAndOwner(groupId, subject));
     }
 
+
+    private String currentSubject() {
+        String subject = token.getSubject();
+        if (subject == null || subject.isBlank()) {
+            throw new NotAuthorizedException("Bearer");
+        }
+        return subject;
+    }
+
+    private void requireOwnership(Contact contact) {
+        if (!currentSubject().equals(contact.getOwner())) {
+            throw new ForbiddenException("Cannot access another owner's contact");
+        }
+    }
 
     private ContactResponse toResponse(Contact contact) {
         ContactResponse response = new ContactResponse();

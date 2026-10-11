@@ -5,6 +5,7 @@ import com.unifonic.contacts.dto.ContactResponse;
 import com.unifonic.contacts.dto.PagedResponse;
 import com.unifonic.contacts.service.ContactService;
 import jakarta.inject.Inject;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.*;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.core.MediaType;
@@ -15,6 +16,9 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.headers.Header;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
+import org.eclipse.microprofile.openapi.annotations.enums.SecuritySchemeType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Max;
 
@@ -24,6 +28,11 @@ import jakarta.validation.constraints.Max;
         description = "Operations for managing contacts"
 )
 @Path("/api/v1/contacts")
+@SecurityScheme(securitySchemeName = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")
+@SecurityRequirement(name = "bearerAuth")
+@APIResponse(responseCode = "401", description = "Missing or invalid JWT")
+@APIResponse(responseCode = "403", description = "Insufficient role or contact ownership")
+@RolesAllowed({"user", "admin"})
 public class ContactResource {
 
     @Inject

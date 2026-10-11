@@ -28,6 +28,10 @@ docker build -f contacts-api/src/main/docker/Dockerfile.jvm -t contacts-api cont
 
 The Docker-based Keycloak setup, realm configuration, users, service account, and JWT examples are documented in [identity/README.md](identity/README.md).
 
+## API security
+
+All API endpoints require a Keycloak access token. Contacts are scoped to the verified JWT subject; admins manage shared groups without bypassing contact ownership. See [docs/security.md](docs/security.md) for permissions, token validation, legacy ownership handling, and tests.
+
 ## Database Setup
 
 Create a MySQL database:

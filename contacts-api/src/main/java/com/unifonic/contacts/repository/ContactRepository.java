@@ -9,22 +9,12 @@ import java.util.List;
 @ApplicationScoped
 public class ContactRepository implements PanacheRepository<Contact> {
 
-    public List<Contact> findPagedByGroupId(Long groupId, int page, int size) {
-        return find("group.id", groupId).page(page, size).list();
+    public List<Contact> findPagedByGroupIdAndOwner(Long groupId, String owner, int page, int size) {
+        return find("group.id = ?1 and owner = ?2 order by id", groupId, owner).page(page, size).list();
     }
 
-    public long countByGroupId(Long groupId) {
-        return count("group.id", groupId);
-    }
-
-    public List<Contact> findPaged(int page, int size) {
-        return findAll()
-                .page(page, size)
-                .list();
-    }
-
-    public long countAll() {
-        return count();
+    public long countByGroupIdAndOwner(Long groupId, String owner) {
+        return count("group.id = ?1 and owner = ?2", groupId, owner);
     }
 
     public List<Contact> findPagedByOwner(
@@ -32,7 +22,7 @@ public class ContactRepository implements PanacheRepository<Contact> {
             int page,
             int size) {
 
-        return find("owner", owner)
+        return find("owner = ?1 order by id", owner)
                 .page(page, size)
                 .list();
     }

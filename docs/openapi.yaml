@@ -37,7 +37,6 @@ components:
       - firstName
       - lastName
       - email
-      - owner
       properties:
         firstName:
           type: string
@@ -54,10 +53,6 @@ components:
         phone:
           type: string
           maxLength: 50
-        owner:
-          type: string
-          pattern: \S
-          maxLength: 100
         groupId:
           type: integer
           format: int64
@@ -119,6 +114,15 @@ components:
         total:
           type: integer
           format: int64
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    SecurityScheme:
+      type: openIdConnect
+      openIdConnectUrl: http://localhost:8081/realms/contacts/.well-known/openid-configuration
+      description: Authentication
 paths:
   /api/v1/contacts:
     get:
@@ -147,6 +151,10 @@ paths:
           minimum: 1
           default: 10
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role or contact ownership
         "200":
           description: Contacts retrieved successfully
           content:
@@ -155,6 +163,8 @@ paths:
                 $ref: "#/components/schemas/PagedResponseContactResponse"
         "400":
           description: Invalid pagination parameters
+      security:
+      - bearerAuth: []
     post:
       summary: Create a contact
       description: Creates a new contact
@@ -167,20 +177,23 @@ paths:
               $ref: "#/components/schemas/ContactRequest"
         required: true
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role or contact ownership
         "201":
           description: Contact created successfully
           headers:
             Location:
               description: URL of the created contact
-              schema:
-                type: string
-                format: uri
         "400":
           description: Invalid contact data
         "404":
           description: Contact group not found
         "409":
           description: Contact email already exists
+      security:
+      - bearerAuth: []
   /api/v1/contacts/{id}:
     put:
       summary: Update a contact
@@ -201,6 +214,10 @@ paths:
               $ref: "#/components/schemas/ContactRequest"
         required: true
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role or contact ownership
         "200":
           description: Contact updated successfully
           content:
@@ -213,6 +230,8 @@ paths:
           description: Contact or contact group not found
         "409":
           description: Contact email already exists
+      security:
+      - bearerAuth: []
     get:
       summary: Get contact by ID
       description: Returns a contact by its ID
@@ -226,6 +245,10 @@ paths:
           type: integer
           format: int64
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role or contact ownership
         "200":
           description: Contact retrieved successfully
           content:
@@ -234,6 +257,8 @@ paths:
                 $ref: "#/components/schemas/ContactResponse"
         "404":
           description: Contact not found
+      security:
+      - bearerAuth: []
     delete:
       summary: Delete a contact
       description: Deletes a contact by its ID
@@ -247,10 +272,16 @@ paths:
           type: integer
           format: int64
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role or contact ownership
         "204":
           description: Contact deleted successfully
         "404":
           description: Contact not found
+      security:
+      - bearerAuth: []
   /api/v1/groups:
     get:
       summary: Get all groups
@@ -278,6 +309,10 @@ paths:
           minimum: 1
           default: 10
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role
         "200":
           description: Groups retrieved successfully
           content:
@@ -286,6 +321,8 @@ paths:
                 $ref: "#/components/schemas/PagedResponseContactGroupResponse"
         "400":
           description: Invalid pagination parameters
+      security:
+      - bearerAuth: []
     post:
       summary: Create a group
       description: Creates a new group
@@ -298,18 +335,21 @@ paths:
               $ref: "#/components/schemas/ContactGroupRequest"
         required: true
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role
         "201":
           description: Group created successfully
           headers:
             Location:
               description: URL of the created group
-              schema:
-                type: string
-                format: uri
         "400":
           description: Invalid group data
         "409":
           description: Group name already exists
+      security:
+      - bearerAuth: []
   /api/v1/groups/{id}:
     put:
       summary: Update a group
@@ -330,14 +370,24 @@ paths:
               $ref: "#/components/schemas/ContactGroupRequest"
         required: true
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role
         "200":
           description: Group updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactGroupResponse"
         "400":
           description: Invalid group data
         "404":
           description: Group not found
         "409":
           description: Group name already exists
+      security:
+      - bearerAuth: []
     get:
       summary: Get group by ID
       description: Returns a contact by its ID
@@ -351,6 +401,10 @@ paths:
           type: integer
           format: int64
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role
         "200":
           description: Group retrieved successfully
           content:
@@ -359,6 +413,8 @@ paths:
                 $ref: "#/components/schemas/ContactGroupResponse"
         "404":
           description: Group not found
+      security:
+      - bearerAuth: []
     delete:
       summary: Delete a group
       description: Deletes a group by its ID
@@ -372,10 +428,16 @@ paths:
           type: integer
           format: int64
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role
         "204":
           description: Group deleted successfully
         "404":
           description: Group not found
+      security:
+      - bearerAuth: []
   /api/v1/groups/{id}/contacts:
     get:
       summary: Get contacts by group
@@ -401,10 +463,14 @@ paths:
         schema:
           type: integer
           format: int32
-          minimum: 1
           maximum: 100
+          minimum: 1
           default: 10
       responses:
+        "401":
+          description: Missing or invalid JWT
+        "403":
+          description: Insufficient role
         "200":
           description: Group contacts retrieved successfully
           content:
@@ -415,6 +481,13 @@ paths:
           description: Invalid pagination parameters
         "404":
           description: Group not found
+      security:
+      - bearerAuth: []
 info:
   title: contacts-api API
   version: 1.0.0-SNAPSHOT
+servers:
+- url: http://localhost:8080
+  description: Auto generated value
+- url: http://0.0.0.0:8080
+  description: Auto generated value
