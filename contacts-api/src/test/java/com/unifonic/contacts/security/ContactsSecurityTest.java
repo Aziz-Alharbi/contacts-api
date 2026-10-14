@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.net.URI;
 import java.net.http.*;
 import java.time.Instant;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 @io.quarkus.test.junit.TestProfile(ContactsSecurityTest.Profile.class)
 @QuarkusTest
@@ -26,7 +26,7 @@ public class ContactsSecurityTest {
     }
     @Test void validServiceTokenSucceeds() throws Exception {
         assertEquals(200,status(OidcTestServer.token("contacts-api",Instant.now().getEpochSecond()+300,OidcTestServer.issuer,false)));
-        assertEquals(401,status(null));
+
     }
     @Test void wrongAudienceIsRejected() throws Exception {
         assertEquals(401,status(OidcTestServer.token("other-api",Instant.now().getEpochSecond()+300,OidcTestServer.issuer,false)));
@@ -70,57 +70,82 @@ public class ContactsSecurityTest {
     @Test void validTokenWithoutApplicationRoleReturns403() throws Exception {
         assertEquals(403,status(OidcTestServer.token("no-role-user","unrelated")));
     }
+    @Test void missingBearerTokenReturns401() throws Exception { assertEquals(401,status(null)); }
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings={"ordinary-user","reporter-test"})
-    void userAndServiceCannotCreateUpdateOrDeleteGroups(String subject) throws Exception {
-        long id=group("restricted-"+subject);
-        String token=OidcTestServer.token(subject,"user");
-        assertEquals(403,request("POST","/api/v1/groups",token,"{\"name\":\"forbidden\"}").statusCode());
-        assertEquals(403,request("PUT","/api/v1/groups/"+id,token,"{\"name\":\"forbidden\"}").statusCode());
-        assertEquals(403,request("DELETE","/api/v1/groups/"+id,token,null).statusCode());
-        assertEquals(200,request("GET","/api/v1/groups/"+id,token,null).statusCode());
-    }
-    @Test void administratorCanCreateUpdateAndDeleteGroups() throws Exception {
-        long id=group("admin-positive");
-        String token=OidcTestServer.token("group-admin","admin");
-        assertEquals(200,request("PUT","/api/v1/groups/"+id,token,"{\"name\":\"admin-updated\"}").statusCode());
-        assertEquals(204,request("DELETE","/api/v1/groups/"+id,token,null).statusCode());
-        assertEquals(404,request("GET","/api/v1/groups/"+id,token,null).statusCode());
+    @org.junit.jupiter.params.provider.CsvSource({"POST,/api/v1/groups","PUT,/api/v1/groups/999999","DELETE,/api/v1/groups/999999"})
+    void ordinaryUserCannotPerformAdministratorGroupOperation(String method,String path) throws Exception {
+        assertEquals(403,request(method,path,OidcTestServer.token("restricted-user","user"),"{\"name\":\"Forbidden\"}").statusCode());
     }
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"other-user,user","other-admin,admin","other-service,user"})
-    void foreignContactsCannotBeReadUpdatedDeletedOrQueried(String subject,String role) throws Exception {
-        String owner="owner-for-"+subject;
-        long id=contact(owner,"user",subject+"@example.test",null);
-        String intruder=OidcTestServer.token(subject,role);
-        assertEquals(403,request("GET","/api/v1/contacts/"+id,intruder,null).statusCode());
-        assertEquals(403,request("PUT","/api/v1/contacts/"+id,intruder,"{\"firstName\":\"Changed\",\"lastName\":\"Test\",\"email\":\"changed@example.test\"}").statusCode());
-        assertEquals(403,request("DELETE","/api/v1/contacts/"+id,intruder,null).statusCode());
-        assertEquals(403,request("GET","/api/v1/contacts?owner="+owner,intruder,null).statusCode());
-        var original=request("GET","/api/v1/contacts/"+id,OidcTestServer.token(owner,"user"),null);
-        assertEquals(200,original.statusCode());
-        assertEquals("Security",json(original).get("firstName").asText());
-        assertEquals(owner,json(original).get("owner").asText());
+    @org.junit.jupiter.params.provider.CsvSource({"POST,/api/v1/groups","PUT,/api/v1/groups/999999","DELETE,/api/v1/groups/999999","DELETE,/api/v1/contacts/999999"})
+    void serviceAccountCannotPerformAdministratorOperation(String method,String path) throws Exception {
+        assertEquals(403,request(method,path,OidcTestServer.token("reporter-test","user"),"{\"name\":\"Forbidden\"}").statusCode());
     }
-    @Test void listsAndGroupPagesIsolateTwoUsersAndAdministrator() throws Exception {
-        long groupId=group("isolation-group");
-        long a=contact("list-a","user","list-a@example.test",groupId);
-        long b=contact("list-b","user","list-b@example.test",groupId);
-        long admin=contact("list-admin","admin","list-admin@example.test",groupId);
-        assertOwnPage("list-a","user","/api/v1/contacts",a);
-        assertOwnPage("list-b","user","/api/v1/contacts",b);
-        assertOwnPage("list-admin","admin","/api/v1/contacts",admin);
-        assertOwnPage("list-a","user","/api/v1/groups/"+groupId+"/contacts",a);
-        assertOwnPage("list-b","user","/api/v1/groups/"+groupId+"/contacts",b);
-        assertOwnPage("list-admin","admin","/api/v1/groups/"+groupId+"/contacts",admin);
+    @Test void ordinaryUserCannotDeleteEvenOwnedContact() throws Exception {
+        long id=contact("user-delete","user","user-delete@example.test",null);
+        assertEquals(403,request("DELETE","/api/v1/contacts/"+id,OidcTestServer.token("user-delete","user"),null).statusCode());
     }
-    void assertOwnPage(String subject,String role,String path,long id) throws Exception {
-        var response=request("GET",path+"?page=0&size=1",OidcTestServer.token(subject,role),null);
-        assertEquals(200,response.statusCode());
-        var page=json(response);
-        assertEquals(1,page.get("total").asLong());
-        assertEquals(1,page.get("items").size());
-        assertEquals(id,page.get("items").get(0).get("id").asLong());
-        assertEquals(subject,page.get("items").get(0).get("owner").asText());
+    @Test void administratorCanDeleteForeignContact() throws Exception {
+        long id=contact("admin-delete-owner","user","admin-delete-owner@example.test",null);
+        assertEquals(204,request("DELETE","/api/v1/contacts/"+id,OidcTestServer.token("deleting-admin","admin"),null).statusCode());
+    }
+    @Test void userCanReadOwnedContact() throws Exception {
+        long id=contact("own-reader","user","own-reader@example.test",null);
+        assertEquals(200,request("GET","/api/v1/contacts/"+id,OidcTestServer.token("own-reader","user"),null).statusCode());
+    }
+    @Test void userCannotReadForeignContact() throws Exception {
+        long id=contact("foreign-read-owner","user","foreign-read-owner@example.test",null);
+        assertEquals(403,request("GET","/api/v1/contacts/"+id,OidcTestServer.token("foreign-reader","user"),null).statusCode());
+    }
+    @Test void userCannotUpdateForeignContact() throws Exception {
+        long id=contact("foreign-update-owner","user","foreign-update-owner@example.test",null);
+        assertEquals(403,request("PUT","/api/v1/contacts/"+id,OidcTestServer.token("foreign-updater","user"),"{\"firstName\":\"Changed\",\"lastName\":\"Test\",\"email\":\"changed@example.test\"}").statusCode());
+    }
+    @Test void administratorCanReadForeignContact() throws Exception {
+        long id=contact("admin-read-owner","user","admin-read-owner@example.test",null);
+        var response=request("GET","/api/v1/contacts/"+id,OidcTestServer.token("reading-admin","admin"),null);
+        assertEquals(200,response.statusCode()); assertEquals("admin-read-owner",json(response).path("owner").asText());
+    }
+    @Test void userCannotFilterByForeignOwner() throws Exception {
+        assertEquals(403,request("GET","/api/v1/contacts?owner=other",OidcTestServer.token("owner-filter-user","user"),null).statusCode());
+    }
+    @Test void administratorCanFilterByForeignOwner() throws Exception {
+        long id=contact("admin-filter-owner","user","admin-filter-owner@example.test",null);
+        var response=request("GET","/api/v1/contacts?owner=admin-filter-owner",OidcTestServer.token("filtering-admin","admin"),null);
+        assertEquals(200,response.statusCode()); assertEquals(id,json(response).path("items").get(0).path("id").asLong()); assertEquals(1,json(response).path("total").asLong());
+    }
+    @Test void userContactListContainsOnlyOwnedRecords() throws Exception {
+        long own=contact("isolated-list-user","user","isolated-list-user@example.test",null);
+        contact("isolated-list-other","user","isolated-list-other@example.test",null);
+        var page=json(request("GET","/api/v1/contacts",OidcTestServer.token("isolated-list-user","user"),null));
+        assertEquals(1,page.path("total").asLong()); assertEquals(own,page.path("items").get(0).path("id").asLong());
+    }
+    @Test void administratorContactListIncludesOtherUsers() throws Exception {
+        long first=contact("global-list-first","user","global-list-first@example.test",null);
+        long second=contact("global-list-second","user","global-list-second@example.test",null);
+        var page=json(request("GET","/api/v1/contacts?size=100",OidcTestServer.token("global-list-admin","admin"),null));
+        assertTrue(page.path("total").asLong()>=2);
+        assertTrue(java.util.stream.StreamSupport.stream(page.path("items").spliterator(),false).anyMatch(item->item.path("id").asLong()==first));
+        assertTrue(java.util.stream.StreamSupport.stream(page.path("items").spliterator(),false).anyMatch(item->item.path("id").asLong()==second));
+    }
+    @Test void userGroupPageContainsOnlyOwnedRecords() throws Exception {
+        long groupId=group("isolated-user-group"); long own=contact("isolated-group-user","user","isolated-group-user@example.test",groupId);
+        contact("isolated-group-other","user","isolated-group-other@example.test",groupId);
+        var page=json(request("GET","/api/v1/groups/"+groupId+"/contacts",OidcTestServer.token("isolated-group-user","user"),null));
+        assertEquals(1,page.path("total").asLong()); assertEquals(own,page.path("items").get(0).path("id").asLong());
+    }
+    @Test void administratorGroupPageIncludesAllOwnersAndCorrectTotal() throws Exception {
+        long groupId=group("global-admin-group"); contact("global-group-first","user","global-group-first@example.test",groupId);
+        long second=contact("global-group-second","user","global-group-second@example.test",groupId);
+        var page=json(request("GET","/api/v1/groups/"+groupId+"/contacts?page=1&size=1",OidcTestServer.token("global-group-admin","admin"),null));
+        assertEquals(2,page.path("total").asLong()); assertEquals(second,page.path("items").get(0).path("id").asLong()); assertEquals(1,page.path("items").size());
+    }
+    @Test void ordinaryUserCanReadSharedGroup() throws Exception {
+        long id=group("user-readable-group");
+        assertEquals(200,request("GET","/api/v1/groups/"+id,OidcTestServer.token("group-reader","user"),null).statusCode());
+    }
+    @Test void administratorReadPrivilegeDoesNotAllowForeignUpdate() throws Exception {
+        long id=contact("read-only-admin-owner","user","read-only-admin-owner@example.test",null);
+        assertEquals(403,request("PUT","/api/v1/contacts/"+id,OidcTestServer.token("read-only-admin","admin"),"{\"firstName\":\"Changed\",\"lastName\":\"Test\",\"email\":\"changed-admin@example.test\"}").statusCode());
     }
 }

@@ -18,7 +18,7 @@ public class GlobalExceptionHandler {
 
     @ServerExceptionMapper
     public Response handleWebApplicationException(WebApplicationException exception) {
-        return exception.getResponse();
+        return Response.fromResponse(exception.getResponse()).entity(ErrorResponses.body(exception.getResponse().getStatus())).type(jakarta.ws.rs.core.MediaType.APPLICATION_JSON).build();
     }
 
     @ServerExceptionMapper

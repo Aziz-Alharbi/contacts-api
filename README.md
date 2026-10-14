@@ -23,6 +23,7 @@ docker build -f contacts-api/src/main/docker/Dockerfile.jvm -t contacts-api cont
 - Java 21
 - Maven
 - MySQL 8
+- Docker and Docker Compose for Keycloak and optional live verification
 
 ## Identity provider
 
@@ -30,7 +31,7 @@ The Docker-based Keycloak setup, realm configuration, users, service account, an
 
 ## API security
 
-All API endpoints require a Keycloak access token. Contacts are scoped to the verified JWT subject; admins manage shared groups without bypassing contact ownership. See [docs/security.md](docs/security.md) for permissions, token validation, legacy ownership handling, and tests.
+All API endpoints require a Keycloak access token. Ordinary users see only contacts owned by their verified JWT subject. Administrators can read all contacts and are the only role permitted to delete contacts or groups. Contact creation assigns the caller as owner; updates retain the ownership restriction. See [docs/security.md](docs/security.md) for permissions, token validation, legacy ownership handling, and tests.
 
 ## Database Setup
 
@@ -95,7 +96,7 @@ docs/openapi.yaml
 The application can be packaged using:
 
 ```shell script
-mvn package
+mvn -pl contacts-api -am package
 ```
 
 It produces the `quarkus-run.jar` file in the `contacts-api/target/quarkus-app/` directory.
@@ -106,7 +107,7 @@ The application is now runnable using `java -jar contacts-api/target/quarkus-app
 If you want to build an _über-jar_, execute the following command:
 
 ```shell script
-mvn package -Dquarkus.package.jar.type=uber-jar
+mvn -pl contacts-api -am package -Dquarkus.package.jar.type=uber-jar
 ```
 
 The application, packaged as an _über-jar_, is now runnable using `java -jar contacts-api/target/*-runner.jar`.
@@ -116,13 +117,13 @@ The application, packaged as an _über-jar_, is now runnable using `java -jar co
 You can create a native executable using:
 
 ```shell script
-mvn package -Dnative
+mvn -pl contacts-api -am package -Dnative
 ```
 
 Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
 
 ```shell script
-mvn package -Dnative -Dquarkus.native.container-build=true
+mvn -pl contacts-api -am package -Dnative -Dquarkus.native.container-build=true
 ```
 
 You can then execute your native executable with: `./contacts-api/target/contacts-api-1.0.0-SNAPSHOT-runner`
@@ -132,3 +133,9 @@ If you want to learn more about building native executables, please consult <htt
 ## Automated tests and coverage
 
 Run `mvn clean verify` to execute API/Reporter tests, generate per-module JaCoCo reports, and enforce 80% line coverage for business logic and endpoints. See [testing and coverage](docs/testing-and-coverage.md) for scope, report paths, and mutation verification.
+
+## Identity and verification commands
+
+Java 21 / Quarkus command-mode utilities live in the existing Reporter module. Build their separate command package with `mvn -pl contacts-reporter package -Dquarkus.profile=tools -DskipTests`. See [identity/TOOLS.md](identity/TOOLS.md) for Device Authorization Flow with demo-user/demo-admin, service tokens, realm export sanitization. Review procedures for Git secrets, controlled defects, and real-service checks are in [docs/security-verification.md](docs/security-verification.md) and [docs/testing-and-coverage.md](docs/testing-and-coverage.md).
+
+Automated `mvn clean verify` tests run without external MySQL or Keycloak. To start from a new machine, build the command package, create `.env` with `init-env`, start Keycloak using Compose, prepare MySQL and `DB_PASSWORD`, then start Contacts API and Contacts Reporter as documented above and in [contacts-reporter/README.md](contacts-reporter/README.md). Real-service verification is documented separately in [docs/security-verification.md](docs/security-verification.md).

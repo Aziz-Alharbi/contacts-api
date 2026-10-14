@@ -30,6 +30,9 @@ public class ContactService {
     JsonWebToken token;
 
     @Inject
+    io.quarkus.security.identity.SecurityIdentity identity;
+
+    @Inject
     ContactGroupRepository contactGroupRepository;
 
 
@@ -41,11 +44,12 @@ public class ContactService {
             String owner) {
 
         String subject = currentSubject();
-        if (owner != null && !owner.isBlank() && !subject.equals(owner)) {
+        if (!isAdmin() && owner != null && !owner.isBlank() && !subject.equals(owner)) {
             throw new ForbiddenException("Cannot query another owner's contacts");
         }
-        List<Contact> contacts = repository.findPagedByOwner(subject, page, size);
-        long total = repository.countByOwner(subject);
+        String filter = isAdmin() ? (owner == null || owner.isBlank() ? null : owner) : subject;
+        List<Contact> contacts = filter == null ? repository.findPaged(page, size) : repository.findPagedByOwner(filter, page, size);
+        long total = filter == null ? repository.count() : repository.countByOwner(filter);
 
         List<ContactResponse> items = contacts.stream()
                 .map(this::toResponse)
@@ -56,6 +60,7 @@ public class ContactService {
 
 
     public ContactResponse getById(Long id) {
+        currentSubject();
         Contact contact = repository.findById(id);
 
         if (contact == null) {
@@ -67,7 +72,7 @@ public class ContactService {
 
         }
 
-        requireOwnership(contact);
+        if (!isAdmin()) requireOwnership(contact);
         return toResponse(contact);
     }
 
@@ -150,13 +155,14 @@ public class ContactService {
     }
 
 
+    @RolesAllowed("admin")
     @Transactional
     public void delete(Long id) {
+        currentSubject();
         Contact contact = repository.findById(id);
         if (contact == null) {
             throw new ApiException(404, "Not Found", "Contact not found with id: " + id);
         }
-        requireOwnership(contact);
         repository.delete(contact);
     }
 
@@ -173,11 +179,11 @@ public class ContactService {
 
 
         String subject = currentSubject();
-        List<ContactResponse> items = repository.findPagedByGroupIdAndOwner(groupId, subject, page, size)
-                .stream()
-                .map(this::toResponse)
-                .toList();
-        return new PagedResponse<>(items, page, size, repository.countByGroupIdAndOwner(groupId, subject));
+        List<Contact> contacts = isAdmin() ? repository.findPagedByGroupId(groupId, page, size)
+                : repository.findPagedByGroupIdAndOwner(groupId, subject, page, size);
+        long total = isAdmin() ? repository.countByGroupId(groupId) : repository.countByGroupIdAndOwner(groupId, subject);
+        List<ContactResponse> items = contacts.stream().map(this::toResponse).toList();
+        return new PagedResponse<>(items, page, size, total);
     }
 
 
@@ -188,6 +194,8 @@ public class ContactService {
         }
         return subject;
     }
+
+    private boolean isAdmin() { return identity.hasRole("admin"); }
 
     private void requireOwnership(Contact contact) {
         if (!currentSubject().equals(contact.getOwner())) {

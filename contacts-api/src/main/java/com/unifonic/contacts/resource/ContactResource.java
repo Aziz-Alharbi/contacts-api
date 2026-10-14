@@ -43,7 +43,7 @@ public class ContactResource {
     @Path("/{id}")
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(summary = "Get contact by ID",
-            description = "Returns a contact by its ID")
+            description = "Returns an owned contact; administrators may read any owner’s contact")
     @APIResponse(
             responseCode = "200",
             description = "Contact retrieved successfully"
@@ -60,7 +60,7 @@ public class ContactResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(summary = "Get all contacts",
-            description = "Returns a paginated and filtered list of contacts")
+            description = "Users list only their own contacts; administrators list all owners or filter by owner")
     @APIResponse(
             responseCode = "200",
             description = "Contacts retrieved successfully"
@@ -153,10 +153,11 @@ public class ContactResource {
 
 
 
+    @RolesAllowed("admin")
     @DELETE
     @Path("/{id}")
     @Operation(summary = "Delete a contact",
-            description = "Deletes a contact by its ID")
+            description = "Administrators only: deletes a contact by its ID regardless of owner")
     @APIResponse(
             responseCode = "204",
             description = "Contact deleted successfully"
