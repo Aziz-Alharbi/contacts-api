@@ -46,6 +46,6 @@ public class ReportService {
 
     private WebApplicationException failure(int status, String message) {
         return new WebApplicationException(Response.status(status)
-                .entity(Map.of("status", status, "message", message)).build());
+                .entity(Map.of("status", status, "error", Response.Status.fromStatusCode(status).getReasonPhrase(), "message", message)).build());
     }
 }

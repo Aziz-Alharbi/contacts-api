@@ -23,7 +23,7 @@ class ContactServiceTest {
     ContactRequest input;
     @BeforeEach void setup() {
         contacts=mock(ContactRepository.class); groups=mock(ContactGroupRepository.class); token=mock(JsonWebToken.class);
-        service=new ContactService(); service.repository=contacts; service.contactGroupRepository=groups; service.token=token;
+        service=new ContactService(); service.repository=contacts; service.contactGroupRepository=groups; service.token=token; service.identity=mock(io.quarkus.security.identity.SecurityIdentity.class);
         when(token.getSubject()).thenReturn("alice");
         existing=new Contact(); existing.setId(17L); existing.setOwner("alice"); existing.setFirstName("Old"); existing.setLastName("Name"); existing.setEmail("old@example.test");
         when(contacts.findById(17L)).thenReturn(existing);
@@ -76,8 +76,8 @@ class ContactServiceTest {
     @Test void foreignUpdateDoesNotMutateRecord() {
         existing.setOwner("bob"); assertThrows(ForbiddenException.class,()->service.update(17L,input)); assertEquals("Old",existing.getFirstName());
     }
-    @Test void foreignDeleteDoesNotRemoveRecord() {
-        existing.setOwner("bob"); assertThrows(ForbiddenException.class,()->service.delete(17L)); verify(contacts,never()).delete(any(Contact.class));
+    @Test void administratorDeleteRemovesForeignContact() {
+        existing.setOwner("bob"); service.delete(17L); verify(contacts).delete(existing);
     }
     @ParameterizedTest @ValueSource(strings={"", "alice"})
     void listPassesSubjectAndPaginationToRepository(String owner) {

@@ -1,13 +1,14 @@
 # Keycloak identity setup
 
-This local development setup runs Keycloak 26.8.0 on `http://localhost:8081`, leaving port 8080 for the API. It imports the `contacts` realm from `realm/contacts-realm.json`. Keycloak stores its development database in a named Docker volume.
+This local development setup runs Keycloak using the version pinned in compose.yaml on `http://localhost:8081`, leaving port 8080 for the API. It imports the `contacts` realm from `realm/contacts-realm.json`. Keycloak stores its development database in a named Docker volume.
 
 ## Start
 
-Install Docker with Docker Compose, then run from the repository root:
+Install Java 21, Maven, and Docker with Docker Compose. Build the command package first, then run from the repository root:
 
 ```bash
-python3 identity/scripts/init_env.py
+mvn -pl contacts-reporter package -Dquarkus.profile=tools -DskipTests
+java -Dquarkus.profile=tools -jar contacts-reporter/target/tools-app/quarkus-run.jar init-env
 docker compose up -d keycloak
 docker compose logs -f keycloak
 ```
@@ -38,18 +39,18 @@ The reporter's allowed role scope is explicitly limited to `user`. Both clients 
 For the reporter:
 
 ```bash
-python3 identity/scripts/get_token.py reporter
+java -Dquarkus.profile=tools -jar contacts-reporter/target/tools-app/quarkus-run.jar token reporter
 ```
 
-The script posts `grant_type=client_credentials`, `client_id=contacts-reporter`, and the secret loaded from `.env` to `http://localhost:8081/realms/contacts/protocol/openid-connect/token`.
+The Java command posts `grant_type=client_credentials`, `client_id=contacts-reporter`, and the secret loaded from `.env` to `http://localhost:8081/realms/contacts/protocol/openid-connect/token`.
 
 For a human user:
 
 ```bash
-python3 identity/scripts/get_token.py user
+java -Dquarkus.profile=tools -jar contacts-reporter/target/tools-app/quarkus-run.jar token user
 ```
 
-Open the URL printed by the script, enter its one-time code, and log in as `demo-user` or `demo-admin`. Keycloak handles the login; the script never receives the person's password. It polls the token endpoint until the login is complete or expires.
+Open the URL printed by the Java command, enter its one-time code, and log in as `demo-user` or `demo-admin`. Keycloak handles the login; the Java command never receives the person's password. It polls the token endpoint until the login is complete or expires.
 
 Both commands print selected decoded claims, not the bearer token:
 
@@ -66,7 +67,7 @@ Decoding does not verify a token. An API must verify the signature using the rea
 To save a token to a new file readable only by your user:
 
 ```bash
-python3 identity/scripts/get_token.py reporter --save /tmp/contacts-reporter.jwt
+java -Dquarkus.profile=tools -jar contacts-reporter/target/tools-app/quarkus-run.jar token reporter --save /tmp/contacts-reporter.jwt
 ```
 
 A future reporter can send it using `Authorization: Bearer <access_token>`. The API now validates bearer JWTs and enforces roles and subject-based contact ownership. See [API security](../docs/security.md). The reporter can access only contacts owned by its own service-account subject.
@@ -83,16 +84,16 @@ To capture settings from a running local realm, stop the server before offline e
 mkdir -p identity/exports
 docker compose stop keycloak
 docker compose run --rm --no-deps --volume "$(pwd)/identity/exports:/opt/keycloak/data/export" keycloak export --realm contacts --file /opt/keycloak/data/export/raw-realm.json --users skip
-python3 identity/scripts/sanitize_export.py identity/exports/raw-realm.json identity/exports/contacts-realm.json
+java -Dquarkus.profile=tools -jar contacts-reporter/target/tools-app/quarkus-run.jar sanitize-export identity/exports/raw-realm.json identity/exports/contacts-realm.json
 docker compose up -d keycloak
 ```
 
 Raw exports can contain client secrets and key-provider data even when users are skipped. `identity/exports/` is ignored by Git. The sanitizer keeps a limited set of realm and application-client settings, replaces users and all credentials with the reviewed template, and retains the template's role scopes and mappers. It intentionally does not migrate arbitrary live users, custom providers, custom mappers, or new roles. Review the sanitized file before sharing; update the tracked template explicitly when those features are needed.
 
-Validate the checked-in configuration and scripts:
+Validate the checked-in configuration and Java commands:
 
 ```bash
-python3 -m unittest discover -s identity/scripts -p 'test_*.py'
+mvn -pl contacts-reporter -Dtest="com.unifonic.tools.*Test" test
 ```
 
 After Docker is available, also run both token commands and confirm the claims match the table. Automated static checks do not replace testing a live realm import and token issuance.
@@ -100,9 +101,11 @@ After Docker is available, also run both token commands and confirm the claims m
 Check discovery and the reporter token automatically after the server starts:
 
 ```bash
-python3 identity/scripts/check_identity.py
+java -Dquarkus.profile=tools -jar contacts-reporter/target/tools-app/quarkus-run.jar check-identity
 ```
 
-This checks the reporter's subject, issuer, API audience, expiration, client identity, and `user` role without `admin`. It prints neither credentials nor bearer tokens and does not perform cryptographic JWT verification. `KC_HOSTNAME` pins the development issuer to `http://localhost:8081`; change the hostname and script issuer together when deploying elsewhere.
+This checks the reporter's subject, issuer, API audience, expiration, client identity, and `user` role without `admin`. It prints neither credentials nor bearer tokens and does not perform cryptographic JWT verification. `KC_HOSTNAME` pins the development issuer to `http://localhost:8081`; change the hostname and configured issuer together when deploying elsewhere.
 
 References: [Keycloak Docker setup](https://www.keycloak.org/getting-started/getting-started-docker), [realm import/export and environment placeholders](https://www.keycloak.org/server/importExport), and [service accounts and role scopes](https://www.keycloak.org/docs/26.8.0/server_admin/#_service_accounts).
+
+The same Device Authorization Flow supports `token demo-user` and `token demo-admin`; passwords are entered only on Keycloak's browser page. See [Java command reference](TOOLS.md) for all commands, private token saves, tools packaging, tests, and private file handling.

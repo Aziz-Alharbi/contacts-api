@@ -8,6 +8,14 @@ import java.util.List;
 
 @ApplicationScoped
 public class ContactRepository implements PanacheRepository<Contact> {
+    public List<Contact> findPaged(int page, int size) {
+        return find("order by id").page(page, size).list();
+    }
+    public List<Contact> findPagedByGroupId(Long groupId, int page, int size) {
+        return find("group.id = ?1 order by id", groupId).page(page, size).list();
+    }
+    public long countByGroupId(Long groupId) { return count("group.id", groupId); }
+
 
     public List<Contact> findPagedByGroupIdAndOwner(Long groupId, String owner, int page, int size) {
         return find("group.id = ?1 and owner = ?2 order by id", groupId, owner).page(page, size).list();

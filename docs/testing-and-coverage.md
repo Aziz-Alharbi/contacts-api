@@ -9,7 +9,7 @@ mvn clean verify
 mvn clean verify -Dsurefire.runOrder=random \
   '-Djunit.quarkus.orderer.secondary-orderer=org.junit.jupiter.api.ClassOrderer$Random' \
   '-Djunit.jupiter.testmethod.order.default=org.junit.jupiter.api.MethodOrderer$Random' \
-  -Djunit.jupiter.execution.order.random.seed=20261011
+  -Djunit.jupiter.execution.order.random.seed=20261012
 ```
 
 The automated suite needs no Docker, MySQL, live Keycloak, or real client secret. API HTTP tests use H2 in MySQL compatibility mode and a local JWKS server with temporary RSA keys. Reporter HTTP tests use local token/API fixtures. Service unit tests instantiate the services directly with Mockito repositories, JWT identity, or API client mocks; they do not start Quarkus or connect to a database. Fixtures contain explicitly fake credentials only.
@@ -18,14 +18,18 @@ The automated suite needs no Docker, MySQL, live Keycloak, or real client secret
 
 | Test class | Cases | Purpose |
 |---|---:|---|
-| `ContactsSecurityTest` | 15 | JWT rejection, roles, admin permissions, ownership isolation, filtered lists |
+| `ContactsSecurityTest` | 30 | JWT rejection, roles, admin permissions, ownership isolation, filtered lists |
+| `HttpErrorsTest` | 32 | All endpoint 401/403 responses, consistent JSON errors, authentication challenges, method headers, malformed payloads |
 | `ApiEndpointsTest` | 31 | Every Contact/ContactGroup endpoint, CRUD fields/status/Location, pagination, validation, missing records, duplicate creates/updates and transaction rollback, group deletion blocked by referenced contacts |
 | `ContactServiceTest` | 21 | CRUD mapping, verified owner assignment, ownership rejection before mutation, repository query/count arguments, missing contacts/groups, persistence failure propagation |
 | `ContactGroupServiceTest` | 10 | CRUD mapping, timestamps, filtered/unfiltered page totals, missing groups, duplicate persistence failure propagation |
 | `ReporterTest` | 10 | Automatic credentials and bearer attachment, real response total, empty data, sanitized upstream failures, malformed data |
 | `WrongSecretTest` | 1 | Failed token acquisition returns generic failure without credentials or fabricated counts |
 | `ReportServiceTest` | 10 | Minimal fetch, total rather than page length, transport failure, null data, invalid/overflowing metadata |
-| **Total** | **98** | Existing security checks plus missing functional/unit cases |
+| `RealmConfigurationTest` | 28 | Realm/client/role/device configuration and safe export sanitization |
+| `OAuthTokensTest` | 27 | Device polling/PKCE, client credentials, sanitized failures, JWT inspection and reporter claims |
+| `LocalFilesTest` | 7 | Private files, overwrite/symlink rejection, environment overrides and invalid command |
+| **Total** | **207** | API, Reporter, identity and utility tests |
 
 Duplicate uniqueness is enforced by the database and mapped to 409 by the exception handler. Mocked service tests verify persistence failures propagate; HTTP tests verify the actual constraint, wrapped-exception mapping, and rollback behavior. Request field validation belongs to the REST boundary and is verified there. Unit tests do not pretend that calling a plain Java object executes Quarkus security/transaction/validation interceptors; signed HTTP tests exercise those controls.
 
@@ -42,11 +46,11 @@ Reports are generated automatically:
 - `contacts-api/target/jacoco-report/index.html` and `jacoco.xml`
 - `contacts-reporter/target/jacoco-report/index.html` and `jacoco.xml`
 
-Measured coverage after the complete suite on October 11, 2026:
+Measured coverage after the complete suite on October 12, 2026:
 
 | Class | Covered / total lines | Coverage |
 |---|---:|---:|
-| ContactService | 81 / 81 | 100% |
+| ContactService | 84 / 84 | 100% |
 | ContactGroupService | 36 / 36 | 100% |
 | ContactResource | 10 / 10 | 100% |
 | ContactGroupResource | 11 / 11 | 100% |
@@ -60,14 +64,7 @@ Line coverage does not guarantee correctness or complete branch coverage. The su
 
 New Reporter metadata cases exposed an actual integer-overflow bug: `page=4294967296` or `size=4294967297` could truncate to the expected values via Jackson `asInt`. Both tests failed before the fix. `canConvertToInt()` checks now reject these responses rather than returning a count.
 
-Run the controlled mutation check explicitly:
-
-```bash
-python3 scripts/check_test_mutations.py
-mvn clean verify
-```
-
-The script temporarily disables contact ownership enforcement and replaces Reporter total with first-page item count. Each selected regression test must fail with an assertion (not compilation/startup errors). Source files are restored in `finally`; the final clean build restores compiled classes and reports. Mutation logs stay under ignored `target/` directories. Run this only while no other process is editing the same sources.
+To demonstrate defect detection manually, temporarily replace `page.get("total").longValue()` with `page.get("items").size()` in Reporter `ReportService`. Run `mvn -pl contacts-reporter -Dtest=ReportServiceTest#countFetchesOnlyOneItemAndUsesTotalRatherThanPageLength test` and require an assertion failure. Restore that exact edit immediately, preserving other local changes, then run `mvn clean verify`. For ownership, temporarily bypass the comparison in `ContactService.requireOwnership` and run `mvn -pl contacts-api -Dtest=ContactServiceTest#foreignUpdateDoesNotMutateRecord test`; require an assertion failure and restore the comparison. Perform these checks only while no other process is editing those sources. A compilation/startup failure does not prove defect detection.
 
 To demonstrate enforcement with intentionally insufficient coverage:
 
@@ -79,12 +76,22 @@ That command must fail the coverage gate for ContactService and the resources. F
 
 ## Security and integration scope
 
-The [security verification matrix](security-verification.md) documents the unchanged 401/403 and ownership contract, the logger change that prevents raw JWT signature-failure messages, and real Keycloak/MySQL smoke verification. No signing keys, bearer JWT values, local credentials, databases, build outputs, or mutation files belong in the commit.
+The [security verification matrix](security-verification.md) documents the 401/403 and ownership contract, the logger change that prevents raw JWT signature-failure messages, and real Keycloak/MySQL smoke verification. No signing keys, bearer JWT values, local credentials, databases, build outputs, or mutation files belong in the commit.
 
-The automated HTTP tests exercise the running application in JVM test mode, not a separate packaged process. The disposable packaged-app check remains available through `python3 contacts-reporter/scripts/verify_e2e.py`; it needs Docker and the local realm/secret. Production deployment, TLS/ingress policy, and whole-project coverage beyond the specified packages are outside this gate.
+The automated HTTP tests exercise the running application in JVM test mode, not a separate packaged process. Manual packaged-app verification is documented in [security verification](security-verification.md); it needs MySQL, Docker/Keycloak, and local credentials. Production deployment, TLS/ingress policy, and whole-project coverage beyond the specified packages are outside this gate.
 
 Coverage configuration follows [Quarkus's JaCoCo guidance](https://quarkus.io/guides/tests-with-coverage/).
 
 ## Verified results
 
-On October 11, 2026, the complete clean build and the profile-aware randomized build both passed all 98 cases with the coverage gate satisfied. The incomplete group-service-only build failed specifically on coverage for the untested ContactService and resources. Both mutation checks produced one assertion failure each and restored source files; the final clean build rebuilt the original implementation. Local credential/JWT and whitespace scans passed.
+On October 14, 2026, `mvn clean verify` passed all 216 Java cases before simplification, with 100% line coverage for every class in the business/endpoint coverage gate. The earlier randomized build passed the existing API/Reporter suite. The earlier incomplete-suite and controlled-mutation checks remain documented above; they were not repeated during this permission update. Identity configuration checks are now JUnit tests in the existing Reporter module; see the Java command reference. See the security verification document for the complete local Git object audit and its limits.
+
+## Java identity utility verification
+
+The existing Reporter module also hosts the named Quarkus command entry point. Its 62 JUnit utility cases replace the former external identity checks and add deterministic Device Flow, PKCE, failure handling, private-file, and realm sanitization cases. Use the [Java command reference](../identity/TOOLS.md) to build the separate tools package. These utility classes do not replace or exclude any business/endpoint class from the existing coverage gate.
+
+After utility simplification on October 14, 2026, `mvn clean verify` passed 207 cases: 124 API, 21 Reporter, and 62 identity/file/command utility cases. All business/endpoint classes retained 100% line coverage and the 80% Maven gate passed. Only the nine tests for the removed history-scanner implementation were removed; application and security tests were retained.
+
+The rebuilt tools package was exercised against a temporary OAuth HTTP fixture using its actual `token user`, `token admin`, and `token reporter` commands. All three obtained a token, printed selected claims without printing the bearer/secret, and saved exactly the received token with mode 0600. Device requests used matching S256 PKCE and service requests used Client Credentials. Packaged environment initialization and realm sanitization also completed with private output files. These checks use fixture tokens, not real Keycloak browser sessions.
+
+The normal packaged Reporter was also started independently in the production profile against temporary OAuth/API fixtures. It acquired its service token through Quarkus, attached the Bearer header, and returned the fixture API's real total of three rather than the one-item page length. It was stopped after verification. The temporary harness was kept outside the repository; no new application service or dependency was added.

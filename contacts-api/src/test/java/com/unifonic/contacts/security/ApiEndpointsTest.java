@@ -62,7 +62,7 @@ class ApiEndpointsTest {
         var response=request("GET","/api/v1/contacts?page=1&size=1&owner=endpoint-pages","endpoint-pages",null);
         assertEquals(200,response.statusCode()); var page=json(response);
         assertEquals(1,page.path("page").asInt()); assertEquals(1,page.path("size").asInt()); assertEquals(2,page.path("total").asLong()); assertEquals(1,page.path("items").size()); assertEquals(second,page.path("items").get(0).path("id").asLong()); assertNotEquals(first,second);
-        var empty=json(request("GET","/api/v1/contacts?page=2&size=1","endpoint-pages",null)); assertEquals(0,empty.path("items").size()); assertEquals(2,empty.path("total").asLong());
+        var empty=json(request("GET","/api/v1/contacts?page=2&size=1&owner=endpoint-pages","endpoint-pages",null)); assertEquals(0,empty.path("items").size()); assertEquals(2,empty.path("total").asLong());
     }
     @ParameterizedTest @ValueSource(strings={"GET","PUT","DELETE"})
     void missingContactReturns404(String method) throws Exception {
@@ -78,7 +78,7 @@ class ApiEndpointsTest {
     @Test void duplicateContactCreateReturns409WithoutAddingRow() throws Exception {
         createContact("duplicate-create","duplicate-create@example.test",null);
         assertEquals(409,request("POST","/api/v1/contacts","duplicate-create",contactBody("duplicate-create@example.test",null)).statusCode());
-        assertEquals(1,json(request("GET","/api/v1/contacts","duplicate-create",null)).path("total").asLong());
+        assertEquals(1,json(request("GET","/api/v1/contacts?owner=duplicate-create","duplicate-create",null)).path("total").asLong());
     }
     @Test void duplicateContactUpdateReturns409AndRollsBack() throws Exception {
         createContact("duplicate-update","duplicate-update-first@example.test",null); long second=createContact("duplicate-update","duplicate-update-second@example.test",null);

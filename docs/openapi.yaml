@@ -127,7 +127,8 @@ paths:
   /api/v1/contacts:
     get:
       summary: Get all contacts
-      description: Returns a paginated and filtered list of contacts
+      description: Users list only their own contacts; administrators list all owners
+        or filter by owner
       tags:
       - Contacts
       parameters:
@@ -234,7 +235,7 @@ paths:
       - bearerAuth: []
     get:
       summary: Get contact by ID
-      description: Returns a contact by its ID
+      description: Returns an owned contact; administrators may read any owner’s contact
       tags:
       - Contacts
       parameters:
@@ -261,7 +262,8 @@ paths:
       - bearerAuth: []
     delete:
       summary: Delete a contact
-      description: Deletes a contact by its ID
+      description: "Administrators only: deletes a contact by its ID regardless of\
+        \ owner"
       tags:
       - Contacts
       parameters:

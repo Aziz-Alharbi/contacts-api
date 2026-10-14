@@ -1,6 +1,6 @@
 # Contacts Reporter
 
-Independent Quarkus application with three production classes, no database, and one local report endpoint:
+Independent Quarkus reporting service with three core classes and a separate optional command-mode package, no database, and one local report endpoint:
 
 ```text
 GET http://localhost:8082/reports/contacts/count
@@ -68,12 +68,6 @@ Live integration checks should run against Keycloak and MySQL: create two report
 
 References: [Quarkus OIDC client and filters](https://quarkus.io/guides/security-openid-connect-client-reference/) and [API security policy](../docs/security.md).
 
-A reproducible disposable-database check is included:
+For step-by-step live verification and Git secret review, see [security verification](../docs/security-verification.md).
 
-```bash
-python3 contacts-reporter/scripts/verify_e2e.py
-```
-
-Run it after `mvn verify`, with Docker running, the existing Keycloak realm available on port 8081, and its local secret available in `.env` or the environment. It starts an isolated MySQL 8.4 container on 13306 and temporary packaged applications on 18080, 18082, and 18083. It creates exactly two contacts in that disposable database, checks the real report, verifies wrong-secret rejection and service-role denial, then stops the applications and removes its test container. It does not write to your existing MySQL database or change the Keycloak realm. These ports must be free.
-
-Verified locally: the full Maven reactor passed, including five Contacts API security tests and five Reporter tests. The disposable live check passed against actual MySQL and Keycloak: count two, missing API JWT 401, forbidden service operation 403, and wrong-secret reporter request 503.
+After command-package simplification, all 21 Reporter cases still pass, including normal reporting, automatic outbound credentials/bearer attachment, empty data, upstream failures, and wrong-secret rejection. Tools remain limited to identity setup, token inspection/private saves, and safe realm export sanitization; see [command reference](../identity/TOOLS.md).

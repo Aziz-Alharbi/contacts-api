@@ -7,7 +7,7 @@ services:
     environment:
       KC_HOSTNAME: http://localhost:8081
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-bootstrap-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?Run python3 identity/scripts/init_env.py first}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?Run the Java identity init-env command first}
       CONTACTS_USER_PASSWORD: ${CONTACTS_USER_PASSWORD:?Missing demo user password}
       CONTACTS_ADMIN_PASSWORD: ${CONTACTS_ADMIN_PASSWORD:?Missing demo admin password}
       CONTACTS_REPORTER_SECRET: ${CONTACTS_REPORTER_SECRET:?Missing reporter secret}
