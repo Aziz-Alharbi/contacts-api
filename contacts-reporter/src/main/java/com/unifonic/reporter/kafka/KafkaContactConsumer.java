@@ -22,6 +22,10 @@ public class KafkaContactConsumer {
     @ConfigProperty(name="contacts.kafka.state-dir", defaultValue=".kafka-state") String stateDir;
     private KafkaStreams streams;
 
+    public synchronized boolean isRunning() {
+        return !enabled || (streams != null && streams.state() == KafkaStreams.State.RUNNING);
+    }
+
     public static Properties streamProperties(KafkaSettings settings, String applicationId, String stateDir) {
         var properties = settings.clientProperties();
         properties.put(StreamsConfig.APPLICATION_ID_CONFIG, applicationId);

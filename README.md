@@ -2,6 +2,27 @@
 
 A Quarkus REST API for managing contacts and contact groups with validation, pagination, and filtering.
 
+## Run the complete system
+
+Install Docker with Docker Compose, then run from a clean checkout:
+
+```bash
+docker compose up --build
+```
+
+This builds and runs Contacts API, Contacts Reporter, MySQL, Keycloak, RabbitMQ and Kafka. No local Java/Maven, prebuilt JAR, `.env`, database creation or manual credentials setup is required. A one-time helper generates random local credentials in a Docker volume. Services wait for real readiness checks; both applications run as UID 10001.
+
+API: <http://localhost:8080>, Reporter: <http://localhost:8082>, Keycloak: <http://localhost:8081>, RabbitMQ UI: <http://localhost:15672>. Application readiness is available at `/q/health/ready` on each application's port.
+
+For detached startup with a readiness wait and the Java end-to-end check:
+
+```bash
+docker compose up --build -d --wait
+docker compose --profile verification run --rm verify
+```
+
+See [container setup, generated credentials, clean-environment verification, and data safety](docs/containers.md). The Maven instructions below remain available for running the applications on the host.
+
 ## Project structure
 
 The root `pom.xml` is the parent and reactor POM. It manages shared Java, dependency, and plugin settings.
@@ -13,10 +34,11 @@ The root `pom.xml` is the parent and reactor POM. It manages shared Java, depend
 
 Run `mvn verify` from the repository root to build all modules. To build only the API and its parent, use `mvn -pl contacts-api -am verify`.
 
-Docker builds use the module as their context:
+Docker builds use the repository root as their context and compile the application in a builder stage:
 
 ```bash
-docker build -f contacts-api/src/main/docker/Dockerfile.jvm -t contacts-api contacts-api
+docker build -f contacts-api/src/main/docker/Dockerfile.jvm -t contacts-api .
+docker build -f contacts-reporter/src/main/docker/Dockerfile.jvm -t contacts-reporter .
 ```
 
 ## RabbitMQ events
@@ -27,7 +49,7 @@ Contact creation writes a transactional outbox event. The Reporter consumes it w
 
 Contact creation publishes the same outbox event to RabbitMQ and Kafka, with independent broker delivery flags. Kafka uses `contactId` keys and the Reporter uses Kafka Streams with durable deduplication and transactional counts. See [Kafka setup, ordering, recovery, and real-broker tests](docs/kafka.md). Start both development brokers with `docker compose up -d --wait kafka rabbitmq`.
 
-## Requirements
+## Requirements for running on the host
 
 - Java 21
 - Maven
@@ -147,4 +169,4 @@ Run `mvn clean verify` to execute API/Reporter tests, generate per-module JaCoCo
 
 Java 21 / Quarkus command-mode utilities live in the existing Reporter module. Build their separate command package with `mvn -pl contacts-reporter package -Dquarkus.profile=tools -DskipTests`. See [identity/TOOLS.md](identity/TOOLS.md) for Device Authorization Flow with demo-user/demo-admin, service tokens, realm export sanitization. Review procedures for Git secrets, controlled defects, and real-service checks are in [docs/security-verification.md](docs/security-verification.md) and [docs/testing-and-coverage.md](docs/testing-and-coverage.md).
 
-Automated `mvn clean verify` tests run without external MySQL or Keycloak. To start from a new machine, build the command package, create `.env` with `init-env`, start Keycloak using Compose, prepare MySQL and `DB_PASSWORD`, then start Contacts API and Contacts Reporter as documented above and in [contacts-reporter/README.md](contacts-reporter/README.md). Real-service verification is documented separately in [docs/security-verification.md](docs/security-verification.md).
+Automated `mvn clean verify` tests run without external MySQL or Keycloak. For the complete system on a new machine, use `docker compose up --build` as documented above. For optional host execution, build the command package, create `.env` with `init-env`, start Keycloak using Compose, prepare MySQL and `DB_PASSWORD`, then start Contacts API and Contacts Reporter as documented above and in [contacts-reporter/README.md](contacts-reporter/README.md). Real-service verification is documented separately in [docs/security-verification.md](docs/security-verification.md).

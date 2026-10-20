@@ -1,6 +1,6 @@
 # Contacts Reporter
 
-Independent Quarkus reporting service with three core classes and a separate optional command-mode package, no database, and one local report endpoint:
+Independent Quarkus reporting service with RabbitMQ/Kafka event consumption, a separate optional command-mode package, no external database service, and one local report endpoint:
 
 ```text
 GET http://localhost:8082/reports/contacts/count
@@ -79,3 +79,6 @@ The Reporter also consumes RabbitMQ contact-created events and logs their IDs an
 ## Kafka event projection
 
 Kafka Streams consumes the same contact-created contract and maintains unique-event counts per contact in Kafka-backed state, with no external database service. A duplicate event does not produce another count result, including after restart and changelog restoration. RabbitMQ consumption and the existing HTTP contact count remain available. See [Kafka configuration, consistency limits, and tests](../docs/kafka.md).
+## Complete container system
+
+From the repository root, `docker compose up --build` builds and starts both applications and their dependencies without local Maven/Java or an environment file. The Reporter uses internal service URLs, runs as UID 10001, and keeps its recoverable Kafka cache in a named volume. See [container setup and verification](../docs/containers.md).

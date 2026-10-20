@@ -1,13 +1,50 @@
+x-reporter-image: &reporter-image
+  image: ${COMPOSE_PROJECT_NAME:-contacts-api}-reporter:local
+  build:
+    context: .
+    dockerfile: contacts-reporter/src/main/docker/Dockerfile.jvm
+
 services:
+  local-secrets:
+    <<: *reporter-image
+    entrypoint: [java, -cp, '/deployments/lib/main/*', com.unifonic.events.container.ContainerSupport, init, /run/development-secrets]
+    volumes:
+      - development-secrets:/run/development-secrets
+    restart: "no"
+    security_opt: [no-new-privileges:true]
+
+  mysql:
+    image: mysql:8.4
+    entrypoint: [/bin/sh, /opt/contacts/mysql.sh]
+    command: [mysqld, --innodb-buffer-pool-size=128M]
+    environment:
+      MYSQL_DATABASE: contacts_db
+      MYSQL_USER: contacts
+      MYSQL_ROOT_HOST: localhost
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - development-secrets:/run/development-secrets:ro
+      - ./containers/mysql.sh:/opt/contacts/mysql.sh:ro
+    depends_on:
+      local-secrets: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$${MYSQL_PASSWORD:-$$(cat /run/development-secrets/mysql-app)}" mysql -ucontacts -h127.0.0.1 contacts_db -Nse "SELECT 1" >/dev/null 2>&1']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
   kafka:
     image: apache/kafka:4.1.2
     ports:
-      - "127.0.0.1:9092:9092"
+      - "127.0.0.1:${KAFKA_PORT:-9092}:9092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LISTENERS: INTERNAL://:19092,EXTERNAL://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,EXTERNAL://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,EXTERNAL://localhost:${KAFKA_PORT:-9092}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
@@ -18,13 +55,157 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms128m -Xmx384m
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:19092 --list >/dev/null 2>&1"]
-      interval: 5s
+      test: [CMD-SHELL, '/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:19092 --list >/dev/null 2>&1']
+      interval: 10s
       timeout: 10s
       retries: 24
+      start_period: 20s
+
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    entrypoint: [/bin/sh, /opt/contacts/rabbitmq.sh]
+    command: [rabbitmq-server]
+    ports:
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-contacts}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - development-secrets:/run/development-secrets:ro
+      - ./containers/rabbitmq.sh:/opt/contacts/rabbitmq.sh:ro
+    depends_on:
+      local-secrets: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD-SHELL, 'rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_port_connectivity && rabbitmq-diagnostics -q check_local_alarms']
+      interval: 10s
+      timeout: 10s
+      retries: 24
+      start_period: 20s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.0
+    entrypoint: [/bin/bash, /opt/contacts/keycloak.sh]
+    command: [start-dev, --import-realm]
+    ports:
+      - "127.0.0.1:${KEYCLOAK_PORT:-8081}:8080"
+    environment:
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8081}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+      JAVA_OPTS_KC_HEAP: -Xms128m -Xmx384m
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-bootstrap-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-}
+      CONTACTS_USER_PASSWORD: ${CONTACTS_USER_PASSWORD:-}
+      CONTACTS_ADMIN_PASSWORD: ${CONTACTS_ADMIN_PASSWORD:-}
+      CONTACTS_REPORTER_SECRET: ${CONTACTS_REPORTER_SECRET:-}
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - development-secrets:/run/development-secrets:ro
+      - ./containers/keycloak.sh:/opt/contacts/keycloak.sh:ro
+      - ./identity/realm:/opt/keycloak/data/import:ro
+    depends_on:
+      local-secrets: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD-SHELL, "{ printf 'HEAD /health/ready HTTP/1.0\\r\\n\\r\\n' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  contacts-api:
+    image: ${COMPOSE_PROJECT_NAME:-contacts-api}-api:local
+    build:
+      context: .
+      dockerfile: contacts-api/src/main/docker/Dockerfile.jvm
+    ports:
+      - "127.0.0.1:${CONTACTS_API_PORT:-8080}:8080"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/contacts_db
+      DB_USERNAME: contacts
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      QUARKUS_OIDC_AUTH_SERVER_URL: http://keycloak:8080/realms/contacts
+      QUARKUS_OIDC_DISCOVERY_ENABLED: "false"
+      QUARKUS_OIDC_JWKS_PATH: protocol/openid-connect/certs
+      QUARKUS_OIDC_TOKEN_ISSUER: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8081}/realms/contacts
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-contacts}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      KAFKA_CONTACT_TOPIC: ${KAFKA_CONTACT_TOPIC:-contacts.contact-created.v1}
+      KAFKA_COUNTS_TOPIC: ${KAFKA_COUNTS_TOPIC:-contacts.reporter.contact-counts.v1}
+      KAFKA_PARTITIONS: ${KAFKA_PARTITIONS:-3}
+      KAFKA_REPLICATION_FACTOR: ${KAFKA_REPLICATION_FACTOR:-1}
+      JAVA_OPTS: -XX:MaxRAMPercentage=50
+    volumes:
+      - development-secrets:/run/development-secrets:ro
+    depends_on:
+      mysql: {condition: service_healthy}
+      keycloak: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+    mem_limit: 512m
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    init: true
+
+  contacts-reporter:
+    <<: *reporter-image
+    ports:
+      - "127.0.0.1:${CONTACTS_REPORTER_PORT:-8082}:8082"
+    environment: &reporter-environment
+      CONTACTS_API_URL: http://contacts-api:8080
+      KEYCLOAK_URL: http://keycloak:8080
+      CONTACTS_REPORTER_SECRET: ${CONTACTS_REPORTER_SECRET:-}
+      QUARKUS_OIDC_CLIENT_DISCOVERY_ENABLED: "false"
+      QUARKUS_OIDC_CLIENT_TOKEN_PATH: protocol/openid-connect/token
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-contacts}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      KAFKA_CONTACT_TOPIC: ${KAFKA_CONTACT_TOPIC:-contacts.contact-created.v1}
+      KAFKA_COUNTS_TOPIC: ${KAFKA_COUNTS_TOPIC:-contacts.reporter.contact-counts.v1}
+      KAFKA_PARTITIONS: ${KAFKA_PARTITIONS:-3}
+      KAFKA_REPLICATION_FACTOR: ${KAFKA_REPLICATION_FACTOR:-1}
+      KAFKA_REPORTER_APPLICATION_ID: ${KAFKA_REPORTER_APPLICATION_ID:-contacts-reporter-v1}
+      KAFKA_STATE_DIR: /var/lib/contacts-reporter/kafka
+      JAVA_OPTS: -XX:MaxRAMPercentage=40
+    volumes:
+      - development-secrets:/run/development-secrets:ro
+      - reporter-state:/var/lib/contacts-reporter
+    depends_on:
+      contacts-api: {condition: service_healthy}
+      keycloak: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+    mem_limit: 1g
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    init: true
+
+  verify:
+    <<: *reporter-image
+    profiles: [verification]
+    entrypoint: [java, '-Djava.util.logging.manager=org.jboss.logmanager.LogManager', -cp, '/deployments/app/*:/deployments/lib/main/*:/deployments/lib/boot/*', com.unifonic.container.ComposeSmoke]
+    environment:
+      <<: *reporter-environment
+      CONTACTS_USER_PASSWORD: ${CONTACTS_USER_PASSWORD:-}
+      CONTACTS_ADMIN_PASSWORD: ${CONTACTS_ADMIN_PASSWORD:-}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8081}
+    volumes:
+      - development-secrets:/run/development-secrets:ro
+    depends_on:
+      contacts-reporter: {condition: service_healthy}
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
   kafka-test:
     profiles: [integration]
     image: apache/kafka:4.1.2
@@ -48,25 +229,11 @@ services:
     tmpfs:
       - /var/lib/kafka/data:mode=1777
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:19092 --list >/dev/null 2>&1"]
+      test: [CMD-SHELL, '/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:19092 --list >/dev/null 2>&1']
       interval: 5s
       timeout: 10s
       retries: 24
-  rabbitmq:
-    image: rabbitmq:4.1-management
-    ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-contacts}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-contacts-dev-only}
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
+
   rabbitmq-test:
     profiles: [integration]
     image: rabbitmq:4.1-management
@@ -78,27 +245,15 @@ services:
     tmpfs:
       - /var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
       interval: 5s
       timeout: 5s
       retries: 12
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.4.0
-    command: [start-dev, --import-realm]
-    ports:
-      - "127.0.0.1:8081:8080"
-    environment:
-      KC_HOSTNAME: http://localhost:8081
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-bootstrap-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?Run the Java identity init-env command first}
-      CONTACTS_USER_PASSWORD: ${CONTACTS_USER_PASSWORD:?Missing demo user password}
-      CONTACTS_ADMIN_PASSWORD: ${CONTACTS_ADMIN_PASSWORD:?Missing demo admin password}
-      CONTACTS_REPORTER_SECRET: ${CONTACTS_REPORTER_SECRET:?Missing reporter secret}
-    volumes:
-      - keycloak-data:/opt/keycloak/data
-      - ./identity/realm:/opt/keycloak/data/import:ro
 
 volumes:
+  development-secrets:
+  mysql-data:
+  reporter-state:
   kafka-data:
   rabbitmq-data:
   keycloak-data:

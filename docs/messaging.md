@@ -15,7 +15,7 @@ mvn -pl contacts-reporter quarkus:dev
 
 The initial `mvn install` installs the parent and shared events artifact for single-module development commands. Normal `mvn verify` builds all modules without requiring an installed artifact.
 
-AMQP is bound to localhost:5672. Management UI: http://localhost:15672 (local defaults `contacts` / `contacts-dev-only`). The development broker has a named volume. Both applications read `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, and `RABBITMQ_VHOST`; defaults match Compose. Compose reads `.env`, but Maven does not automatically export it: export any customized values in the application terminals. Connections are lazy and retried by the scheduled jobs, so a temporarily unavailable broker does not prevent contact creation.
+AMQP is bound to localhost:5672. Management UI: http://localhost:15672 (user `contacts`). Complete Compose startup generates the password in a runtime volume unless `RABBITMQ_PASSWORD` is explicitly overridden; see [container credentials](containers.md#local-credentials). For host-based Maven applications, export that generated password or configure the same explicit local override for broker and applications. Both applications read `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, and `RABBITMQ_VHOST`. Compose reads `.env`, but Maven does not automatically export it. Connections are lazy and retried by the scheduled jobs, so a temporarily unavailable broker does not prevent contact creation.
 
 ## Version 1 event contract
 

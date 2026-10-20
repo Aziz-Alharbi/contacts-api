@@ -103,3 +103,7 @@ See [messaging verification](messaging.md#repeatable-tests) for the new outbox/H
 ## Kafka and dual-broker verification
 
 See [Kafka tests and recovery](kafka.md#tests) for producer key/confirmation checks, durable event-ID deduplication, contact ordering, independent outbox delivery flags, and opt-in Kafka/RabbitMQ tests. Kafka jobs are disabled in the default test and identity tools profiles. The real-broker tests separately verify HTTP creation/dual publication and Streams restoration into a fresh local state directory.
+
+## Container verification
+
+The [container guide](containers.md#end-to-end-verification) documents the real six-service Compose check and a separate Java 21/Linux build of this same test suite with exported summaries and coverage. `ContainerSupportTest` adds random credential generation, restart preservation, malformed-file rejection and symlink rejection checks. Application readiness also checks the real brokers and Reporter's Kafka Streams state.

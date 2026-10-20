@@ -4,6 +4,8 @@ This local development setup runs Keycloak using the version pinned in compose.y
 
 ## Start
 
+For the complete container system, use `docker compose up --build` with no manual environment initialization. Random local credentials are generated in a Docker volume and the realm is imported automatically. See [container setup](../docs/containers.md) for login credentials and verification. The instructions below describe the optional host-based Java development workflow.
+
 Install Java 21, Maven, and Docker with Docker Compose. Build the command package first, then run from the repository root:
 
 ```bash
