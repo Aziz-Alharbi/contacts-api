@@ -1,0 +1,73 @@
+name: Publish images
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-main
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    name: Validate release
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish verified images
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    env:
+      COMMIT_SHA: ${{ github.sha }}
+      REPOSITORY_OWNER: ${{ github.repository_owner }}
+    steps:
+      - name: Download API image
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image-contacts-api-${{ github.sha }}
+          path: ${{ runner.temp }}/images
+
+      - name: Download Reporter image
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image-contacts-reporter-${{ github.sha }}
+          path: ${{ runner.temp }}/images
+
+      - name: Load and check both images
+        shell: bash
+        run: |
+          set -euo pipefail
+          for application in contacts-api contacts-reporter; do
+            docker load --input "$RUNNER_TEMP/images/$application.tar"
+            test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$application:ci")" = "$COMMIT_SHA"
+            test "$(docker image inspect --format '{{.Config.User}}' "$application:ci")" = '10001:10001'
+          done
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish commit images
+        shell: bash
+        run: |
+          set -euo pipefail
+          namespace="${REPOSITORY_OWNER,,}"
+          for application in contacts-api contacts-reporter; do
+            image="ghcr.io/$namespace/$application:sha-$COMMIT_SHA"
+            docker tag "$application:ci" "$image"
+            docker push "$image"
+            printf '%s\n' "Published: $image" >> "$GITHUB_STEP_SUMMARY"
+          done

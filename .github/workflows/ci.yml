@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: |
+            pom.xml
+            contacts-events/pom.xml
+            contacts-api/pom.xml
+            contacts-reporter/pom.xml
+            containers/maven-settings.xml
+
+      - name: Verify all modules
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          --settings containers/maven-settings.xml -itr
+          clean verify
+          -DskipTests=false
+          -Dmaven.test.skip=false
+          -Dmaven.test.failure.ignore=false
+          -Djacoco.skip=false
+          -Dmaven.antrun.skip=false
+
+      - name: Preserve test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verification-reports-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            contacts-api/target/surefire-reports/**
+            contacts-api/target/failsafe-reports/**
+            contacts-api/target/jacoco-report/**
+            contacts-reporter/target/surefire-reports/**
+            contacts-reporter/target/jacoco-report/**
+
+  images:
+    name: Build ${{ matrix.application }} image
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        application: [contacts-api, contacts-reporter]
+    env:
+      APPLICATION: ${{ matrix.application }}
+      COMMIT_SHA: ${{ github.sha }}
+      DOCKER_BUILD_RECORD_UPLOAD: 'false'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build application image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ${{ matrix.application }}/src/main/docker/Dockerfile.jvm
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ${{ matrix.application }}:ci
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.application }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.application }}
+
+      - name: Check runtime image
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect --format '{{.Config.User}}' "$APPLICATION:ci")" = '10001:10001'
+          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$APPLICATION:ci")" = "$COMMIT_SHA"
+          docker run --rm --network none --entrypoint /bin/sh "$APPLICATION:ci" -ec '
+            test "$(id -u)" = 10001
+            test ! -e /root/.m2
+            test ! -e /workspace
+            test ! -e /deployments/src
+            test ! -e /deployments/target
+            test -z "$(find /deployments /opt/contacts /run/development-secrets -type f \( -name ".env" -o -name ".env.*" -o -name "*.key" -o -name "*.pem" -o -name "*.jwt" \) -print)"
+            test -z "$(find /run/development-secrets -type f -print)"
+          '
+
+      - name: Export verified image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: docker save --output "${RUNNER_TEMP}/${APPLICATION}.tar" "$APPLICATION:ci"
+
+      - name: Preserve verified image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-${{ matrix.application }}-${{ github.sha }}
+          path: ${{ runner.temp }}/${{ matrix.application }}.tar
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
