@@ -1,0 +1,28 @@
+# Build from the repository root; no local JDK/Maven or prebuilt target is needed.
+FROM maven:3.9.9-eclipse-temurin-21 AS build
+WORKDIR /workspace
+ENV MAVEN_OPTS="-Xmx512m -Djava.net.preferIPv4Stack=true -Djava.util.concurrent.ForkJoinPool.common.parallelism=2 -Daether.connector.basic.threads=2"
+COPY pom.xml ./
+COPY contacts-events/pom.xml contacts-events/pom.xml
+COPY contacts-api/pom.xml contacts-api/pom.xml
+COPY contacts-reporter/pom.xml contacts-reporter/pom.xml
+COPY contacts-events/src/main/ contacts-events/src/main/
+COPY contacts-reporter/src/main/ contacts-reporter/src/main/
+COPY containers/maven-settings.xml /opt/contacts/maven-settings.xml
+RUN --mount=type=cache,id=contacts-build-maven,target=/root/.m2,sharing=locked mvn -s /opt/contacts/maven-settings.xml -itr -U -B -ntp -pl contacts-reporter -am package -DskipTests
+
+FROM eclipse-temurin:21-jre-jammy
+RUN groupadd --gid 10001 contacts && useradd --uid 10001 --gid 10001 --no-create-home contacts \
+    && mkdir -p /deployments /run/development-secrets /var/lib/contacts-reporter \
+    && chown -R 10001:10001 /deployments /run/development-secrets /var/lib/contacts-reporter
+WORKDIR /deployments
+COPY --from=build --chown=10001:10001 /workspace/contacts-reporter/target/quarkus-app/lib/ ./lib/
+COPY --from=build --chown=10001:10001 /workspace/contacts-reporter/target/quarkus-app/*.jar ./
+COPY --from=build --chown=10001:10001 /workspace/contacts-reporter/target/quarkus-app/app/ ./app/
+COPY --from=build --chown=10001:10001 /workspace/contacts-reporter/target/quarkus-app/quarkus/ ./quarkus/
+COPY --chmod=0555 containers/application.sh /opt/contacts/application.sh
+ENV APPLICATION=reporter QUARKUS_HTTP_HOST=0.0.0.0
+USER 10001:10001
+EXPOSE 8082
+HEALTHCHECK --interval=10s --timeout=8s --start-period=90s --retries=18 CMD ["java", "-Xmx32m", "-cp", "/deployments/lib/main/*", "com.unifonic.events.container.ContainerSupport", "health", "http://127.0.0.1:8082/q/health/ready"]
+ENTRYPOINT ["/opt/contacts/application.sh"]

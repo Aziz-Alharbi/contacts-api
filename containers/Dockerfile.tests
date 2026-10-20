@@ -1,0 +1,20 @@
+FROM maven:3.9.9-eclipse-temurin-21 AS checks
+WORKDIR /workspace
+ENV MAVEN_OPTS="-Xmx512m -Djava.net.preferIPv4Stack=true -Djava.util.concurrent.ForkJoinPool.common.parallelism=2 -Daether.connector.basic.threads=2"
+COPY pom.xml ./
+COPY contacts-events/pom.xml contacts-events/pom.xml
+COPY contacts-api/pom.xml contacts-api/pom.xml
+COPY contacts-reporter/pom.xml contacts-reporter/pom.xml
+COPY contacts-events/src/main/ contacts-events/src/main/
+COPY contacts-api/src/ contacts-api/src/
+COPY contacts-reporter/src/ contacts-reporter/src/
+COPY identity/realm/contacts-realm.json identity/realm/contacts-realm.json
+COPY containers/maven-settings.xml /opt/contacts/maven-settings.xml
+RUN --mount=type=cache,id=contacts-build-maven,target=/root/.m2,sharing=locked mvn -s /opt/contacts/maven-settings.xml -itr -B -ntp clean verify
+
+# Export only test summaries and coverage, not a runnable application or test secrets.
+FROM scratch
+COPY --from=checks /workspace/contacts-api/target/surefire-reports/*.txt /api-tests/
+COPY --from=checks /workspace/contacts-reporter/target/surefire-reports/*.txt /reporter-tests/
+COPY --from=checks /workspace/contacts-api/target/jacoco-report/jacoco.xml /api-coverage.xml
+COPY --from=checks /workspace/contacts-reporter/target/jacoco-report/jacoco.xml /reporter-coverage.xml
