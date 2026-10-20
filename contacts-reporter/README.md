@@ -71,3 +71,7 @@ References: [Quarkus OIDC client and filters](https://quarkus.io/guides/security
 For step-by-step live verification and Git secret review, see [security verification](../docs/security-verification.md).
 
 After command-package simplification, all 21 Reporter cases still pass, including normal reporting, automatic outbound credentials/bearer attachment, empty data, upstream failures, and wrong-secret rejection. Tools remain limited to identity setup, token inspection/private saves, and safe realm export sanitization; see [command reference](../identity/TOOLS.md).
+
+## Contact-created event consumer
+
+The Reporter also consumes RabbitMQ contact-created events and logs their IDs and result. Processing gets three total attempts before dead-lettering. This does not change the HTTP count endpoint. See [messaging setup, topology, failure demonstration, and broker tests](../docs/messaging.md).

@@ -10,6 +10,8 @@
     <artifactId>contacts-reporter</artifactId>
     <packaging>quarkus</packaging>
     <dependencies>
+        <dependency><groupId>com.unifonic.intern</groupId><artifactId>contacts-events</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-scheduler</artifactId></dependency>
         <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
         <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-client-jackson</artifactId></dependency>
         <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-oidc-client</artifactId></dependency>

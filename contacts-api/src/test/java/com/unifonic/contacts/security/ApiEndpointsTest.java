@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @QuarkusTestResource(OidcTestServer.class)
 class ApiEndpointsTest {
     @TestHTTPResource URI base;
+    @jakarta.inject.Inject jakarta.persistence.EntityManager em;
     final ObjectMapper mapper=new ObjectMapper();
     HttpResponse<String> request(String method,String path,String subject,String body) throws Exception {
         String token=OidcTestServer.token(subject,"admin");
@@ -38,6 +39,53 @@ class ApiEndpointsTest {
         var response=request("POST","/api/v1/groups","endpoint-admin","{\"name\":\""+name+"\",\"description\":\"Description\"}");
         assertEquals(201,response.statusCode(),response.body()); long id=json(response).path("id").asLong();
         assertEquals(base.resolve("/api/v1/groups/"+id).toString(),response.headers().firstValue("Location").orElseThrow()); return id;
+    }
+    @Test void creationCommitsOutboxAndDuplicateFailureDoesNotAddEvent() throws Exception {
+        String email = "outbox-atomic@example.test";
+        var created = request("POST", "/api/v1/contacts", "outbox-owner", contactBody(email, null));
+        assertEquals(201, created.statusCode(), created.body());
+        long id = json(created).path("id").asLong();
+        var correlation = java.util.UUID.fromString(created.headers().firstValue("X-Correlation-ID").orElseThrow());
+        io.quarkus.narayana.jta.QuarkusTransaction.requiringNew().run(() -> {
+            var row = em.createQuery("from ContactOutbox where contactId = :id", com.unifonic.contacts.events.ContactOutbox.class)
+                    .setParameter("id", id).getSingleResult();
+            assertEquals(correlation, row.correlationId);
+            assertNotNull(row.eventId); assertNotNull(row.occurredAt);
+        });
+        long before = outboxCount();
+        assertEquals(409, request("POST", "/api/v1/contacts", "outbox-owner", contactBody(email, null)).statusCode());
+        assertEquals(before, outboxCount());
+        assertEquals(404, request("POST", "/api/v1/contacts", "outbox-owner", contactBody("outbox-invalid@example.test", 999999L)).statusCode());
+        assertEquals(before, outboxCount());
+    }
+    @Test void suppliedCorrelationIdIsPreservedAndInvalidHeaderRejectsCreation() throws Exception {
+        String correlation = java.util.UUID.randomUUID().toString();
+        var builder = HttpRequest.newBuilder(base.resolve("/api/v1/contacts"))
+                .header("Authorization", "Bearer " + OidcTestServer.token("correlation-owner", "user"))
+                .header("Content-Type", "application/json");
+        try (var client = HttpClient.newHttpClient()) {
+            var response = client.send(builder.copy().header("X-Correlation-ID", correlation)
+                    .POST(HttpRequest.BodyPublishers.ofString(contactBody("correlation-good@example.test", null))).build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(201, response.statusCode(), response.body());
+            assertEquals(correlation, response.headers().firstValue("X-Correlation-ID").orElseThrow());
+            long id = json(response).path("id").asLong();
+            io.quarkus.narayana.jta.QuarkusTransaction.requiringNew().run(() -> {
+                var row = em.createQuery("from ContactOutbox where contactId = :id", com.unifonic.contacts.events.ContactOutbox.class)
+                        .setParameter("id", id).getSingleResult();
+                assertEquals(java.util.UUID.fromString(correlation), row.correlationId);
+            });
+            long before = outboxCount();
+            var rejected = client.send(builder.copy().header("X-Correlation-ID", "invalid")
+                    .POST(HttpRequest.BodyPublishers.ofString(contactBody("correlation-bad@example.test", null))).build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(400, rejected.statusCode(), rejected.body());
+            assertEquals(before, outboxCount());
+        }
+    }
+    long outboxCount() {
+        return io.quarkus.narayana.jta.QuarkusTransaction.requiringNew().call(() ->
+                em.createQuery("select count(o) from ContactOutbox o", Long.class).getSingleResult());
     }
     @Test void contactCreateAndReadReturnPersistedFields() throws Exception {
         long id=createContact("endpoint-read","endpoint-read@example.test",null);

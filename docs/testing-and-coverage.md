@@ -95,3 +95,7 @@ After utility simplification on October 14, 2026, `mvn clean verify` passed 207 
 The rebuilt tools package was exercised against a temporary OAuth HTTP fixture using its actual `token user`, `token admin`, and `token reporter` commands. All three obtained a token, printed selected claims without printing the bearer/secret, and saved exactly the received token with mode 0600. Device requests used matching S256 PKCE and service requests used Client Credentials. Packaged environment initialization and realm sanitization also completed with private output files. These checks use fixture tokens, not real Keycloak browser sessions.
 
 The normal packaged Reporter was also started independently in the production profile against temporary OAuth/API fixtures. It acquired its service token through Quarkus, attached the Bearer header, and returned the fixture API's real total of three rather than the one-item page length. It was stopped after verification. The temporary harness was kept outside the repository; no new application service or dependency was added.
+
+## RabbitMQ event tests
+
+See [messaging verification](messaging.md#repeatable-tests) for the new outbox/HTTP atomicity, publisher, bounded retry, malformed payload, and ACK error tests, plus the opt-in real RabbitMQ test. Default tests disable messaging jobs and require no broker. The existing business/endpoint coverage gate is preserved.
