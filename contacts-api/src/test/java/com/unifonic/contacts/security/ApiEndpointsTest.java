@@ -51,6 +51,7 @@ class ApiEndpointsTest {
                     .setParameter("id", id).getSingleResult();
             assertEquals(correlation, row.correlationId);
             assertNotNull(row.eventId); assertNotNull(row.occurredAt);
+            assertTrue(row.sequenceNumber > 0); assertFalse(row.rabbitPublished); assertFalse(row.kafkaPublished);
         });
         long before = outboxCount();
         assertEquals(409, request("POST", "/api/v1/contacts", "outbox-owner", contactBody(email, null)).statusCode());

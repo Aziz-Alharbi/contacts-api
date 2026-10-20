@@ -2,7 +2,7 @@
 
 ## Development setup
 
-The two Quarkus applications use the RabbitMQ Java AMQP 0-9-1 client through the shared `contacts-events` module. The Reporter remains database-free. Its HTTP count endpoint is independent of event consumption; events currently produce structured logs, not an accumulated counter.
+The two Quarkus applications use the RabbitMQ Java AMQP 0-9-1 client through the shared `contacts-events` module. The Reporter has no external database service. Its HTTP count endpoint is independent of event consumption; events currently produce structured logs, not an accumulated counter.
 
 ```bash
 # From the repository root, using the existing .env for Compose's Keycloak settings:
@@ -47,9 +47,9 @@ ContactService.create
 
 Both applications idempotently declare identical exchanges, queues and bindings before using a channel. A `direct` exchange is sufficient because the Reporter needs one exact event type, without wildcard routing. Additional subscribers can bind their own queues to the same key. See RabbitMQ's [exchange routing documentation](https://www.rabbitmq.com/docs/exchanges).
 
-The outbox is inserted in the same database transaction as the new contact, so rollback creates neither a contact nor an event. Updates/deletes do not create this event. The publisher reads committed rows with a pessimistic write lock, publishes persistent messages with `mandatory=true`, waits up to five seconds for a publisher confirmation, checks returned unroutable messages, and only then removes the row. Failed publication leaves the row for a later scheduled run. These broker transport retries continue until recovery; they are separate from the bounded consumer processing attempts.
+The outbox is inserted in the same database transaction as the new contact, so rollback creates neither a contact nor an event. Updates/deletes do not create this event. The publisher reads committed rows with a pessimistic write lock, publishes persistent messages with `mandatory=true`, waits up to five seconds for a publisher confirmation, checks returned unroutable messages, and records RabbitMQ delivery. The row is removed only after Kafka delivery also confirms; see [dual-broker publication](kafka.md#publication-through-the-existing-outbox). Failed publication leaves the row for a later scheduled run. These broker transport retries continue until recovery; they are separate from the bounded consumer processing attempts.
 
-A broker confirmation and database commit cannot be atomic: a crash after confirmation but before outbox deletion can cause duplicate delivery. Delivery is **at least once**, and ordering across publishers or reconnections is not guaranteed. The current handler only logs, so duplicate logs are harmless; future counters or other side effects must persistently deduplicate by `eventId`. The outbox has no foreign key to contacts so a pending creation event survives a later deletion.
+A broker confirmation and database commit cannot be atomic: a crash after confirmation but before the broker delivery flag commits can cause duplicate delivery. Delivery is **at least once**, and ordering across publishers or reconnections is not guaranteed. The current handler only logs, so duplicate logs are harmless; future counters or other side effects must persistently deduplicate by `eventId`. The outbox has no foreign key to contacts so a pending creation event survives a later deletion.
 
 ## Processing, attempts, and DLQ
 
@@ -88,7 +88,7 @@ For a manual application demonstration:
 2. To target one event for intentional failure, stop the Reporter first, create another contact, and copy its `eventId` from the publisher log. Start the Reporter with `CONTACTS_FAIL_EVENT_ID=<that UUID>`. The setting targets only that event ID and defaults to disabled.
 3. Expect `attempt=1/3`, `2/3`, `3/3`, then `dead-lettered ... attempts=3`. Inspect the DLQ in the development management UI. The original payload and IDs are retained. A later good contact still produces a success log.
 4. Remove `CONTACTS_FAIL_EVENT_ID` after the demonstration. Inspect/fix failed events before replaying them; replay is manual and may duplicate effects.
-5. For outage verification, stop only the development broker, create a contact, and observe 201 plus a pending `contact_event_outbox` row. Restart RabbitMQ; expect eventual publication and outbox removal. No event is produced for a failed/rolled-back contact creation.
+5. For outage verification, stop only the development broker, create a contact, and observe 201 plus a pending `contact_event_outbox` row. Restart RabbitMQ; expect eventual publication and outbox removal once both RabbitMQ and Kafka have confirmed. No event is produced for a failed/rolled-back contact creation.
 
 The automated broker test exercises the real AMQP publisher, consumer, topology and DLQ together. The HTTP/outbox atomicity test uses H2 and local OIDC fixtures, not a live MySQL/Keycloak deployment.
 

@@ -6,7 +6,7 @@ A Quarkus REST API for managing contacts and contact groups with validation, pag
 
 The root `pom.xml` is the parent and reactor POM. It manages shared Java, dependency, and plugin settings.
 
-- `contacts-events/` contains the shared event contract and RabbitMQ transport/topology.
+- `contacts-events/` contains the shared event contract and RabbitMQ/Kafka transports.
 - `contacts-api/` contains the existing Quarkus application and Dockerfiles.
 - `docs/openapi.yaml` remains the exported API contract.
 - `contacts-reporter/` is the independent, database-free reporting application. See [reporter setup](contacts-reporter/README.md) for Client Credentials, the contact count endpoint, and failure scenarios.
@@ -22,6 +22,10 @@ docker build -f contacts-api/src/main/docker/Dockerfile.jvm -t contacts-api cont
 ## RabbitMQ events
 
 Contact creation writes a transactional outbox event. The Reporter consumes it with three processing attempts and a dead-letter queue. See [RabbitMQ setup, event design, retry behavior, and tests](docs/messaging.md). Start the development broker with `docker compose up -d --wait rabbitmq`, then run `mvn install` once before starting individual modules in development mode.
+
+## Kafka events
+
+Contact creation publishes the same outbox event to RabbitMQ and Kafka, with independent broker delivery flags. Kafka uses `contactId` keys and the Reporter uses Kafka Streams with durable deduplication and transactional counts. See [Kafka setup, ordering, recovery, and real-broker tests](docs/kafka.md). Start both development brokers with `docker compose up -d --wait kafka rabbitmq`.
 
 ## Requirements
 
