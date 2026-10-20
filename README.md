@@ -165,6 +165,10 @@ If you want to learn more about building native executables, please consult <htt
 
 Run `mvn clean verify` to execute API/Reporter tests, generate per-module JaCoCo reports, and enforce 80% line coverage for business logic and endpoints. See [testing and coverage](docs/testing-and-coverage.md) for scope, report paths, and mutation verification.
 
+## Continuous integration and images
+
+Pull requests targeting `main` run Java 21/Maven verification, preserve available test and coverage reports, and build both application images without publishing. Pushes to `main` repeat these checks and publish the verified images to GHCR with full commit SHA tags. See [CI/CD configuration, permissions, image verification and Green/Red evidence](docs/cicd.md). GitHub execution and publication still require the repository owner's review and normal delivery operations.
+
 ## Identity and verification commands
 
 Java 21 / Quarkus command-mode utilities live in the existing Reporter module. Build their separate command package with `mvn -pl contacts-reporter package -Dquarkus.profile=tools -DskipTests`. See [identity/TOOLS.md](identity/TOOLS.md) for Device Authorization Flow with demo-user/demo-admin, service tokens, realm export sanitization. Review procedures for Git secrets, controlled defects, and real-service checks are in [docs/security-verification.md](docs/security-verification.md) and [docs/testing-and-coverage.md](docs/testing-and-coverage.md).
