@@ -75,3 +75,7 @@ After command-package simplification, all 21 Reporter cases still pass, includin
 ## Contact-created event consumer
 
 The Reporter also consumes RabbitMQ contact-created events and logs their IDs and result. Processing gets three total attempts before dead-lettering. This does not change the HTTP count endpoint. See [messaging setup, topology, failure demonstration, and broker tests](../docs/messaging.md).
+
+## Kafka event projection
+
+Kafka Streams consumes the same contact-created contract and maintains unique-event counts per contact in Kafka-backed state, with no external database service. A duplicate event does not produce another count result, including after restart and changelog restoration. RabbitMQ consumption and the existing HTTP contact count remain available. See [Kafka configuration, consistency limits, and tests](../docs/kafka.md).

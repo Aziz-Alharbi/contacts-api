@@ -99,3 +99,7 @@ The normal packaged Reporter was also started independently in the production pr
 ## RabbitMQ event tests
 
 See [messaging verification](messaging.md#repeatable-tests) for the new outbox/HTTP atomicity, publisher, bounded retry, malformed payload, and ACK error tests, plus the opt-in real RabbitMQ test. Default tests disable messaging jobs and require no broker. The existing business/endpoint coverage gate is preserved.
+
+## Kafka and dual-broker verification
+
+See [Kafka tests and recovery](kafka.md#tests) for producer key/confirmation checks, durable event-ID deduplication, contact ordering, independent outbox delivery flags, and opt-in Kafka/RabbitMQ tests. Kafka jobs are disabled in the default test and identity tools profiles. The real-broker tests separately verify HTTP creation/dual publication and Streams restoration into a fresh local state directory.
