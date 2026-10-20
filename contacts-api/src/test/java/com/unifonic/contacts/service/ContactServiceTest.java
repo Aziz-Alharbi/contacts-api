@@ -23,7 +23,7 @@ class ContactServiceTest {
     ContactRequest input;
     @BeforeEach void setup() {
         contacts=mock(ContactRepository.class); groups=mock(ContactGroupRepository.class); token=mock(JsonWebToken.class);
-        service=new ContactService(); service.repository=contacts; service.contactGroupRepository=groups; service.token=token; service.identity=mock(io.quarkus.security.identity.SecurityIdentity.class);
+        service=new ContactService(); service.events=mock(com.unifonic.contacts.events.ContactEventOutbox.class); service.repository=contacts; service.contactGroupRepository=groups; service.token=token; service.identity=mock(io.quarkus.security.identity.SecurityIdentity.class);
         when(token.getSubject()).thenReturn("alice");
         existing=new Contact(); existing.setId(17L); existing.setOwner("alice"); existing.setFirstName("Old"); existing.setLastName("Name"); existing.setEmail("old@example.test");
         when(contacts.findById(17L)).thenReturn(existing);

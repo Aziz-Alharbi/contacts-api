@@ -24,6 +24,9 @@ public class ContactService {
 
 
     @Inject
+    com.unifonic.contacts.events.ContactEventOutbox events;
+
+    @Inject
     ContactRepository repository;
 
     @Inject
@@ -106,6 +109,7 @@ public class ContactService {
         contact.setCreatedAt(LocalDateTime.now());
 
         repository.persist(contact);
+        events.record(contact.getId());
 
         return toResponse(contact);
     }

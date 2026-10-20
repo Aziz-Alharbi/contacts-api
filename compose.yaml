@@ -1,4 +1,34 @@
 services:
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-contacts}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-contacts-dev-only}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  rabbitmq-test:
+    profiles: [integration]
+    image: rabbitmq:4.1-management
+    ports:
+      - "127.0.0.1:5673:5672"
+    environment:
+      RABBITMQ_DEFAULT_USER: contacts-test
+      RABBITMQ_DEFAULT_PASS: contacts-test-only
+    tmpfs:
+      - /var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
   keycloak:
     image: quay.io/keycloak/keycloak:26.4.0
     command: [start-dev, --import-realm]
@@ -16,4 +46,5 @@ services:
       - ./identity/realm:/opt/keycloak/data/import:ro
 
 volumes:
+  rabbitmq-data:
   keycloak-data:

@@ -7,6 +7,7 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>contacts-events</module>
         <module>contacts-api</module>
         <module>contacts-reporter</module>
     </modules>
