@@ -42,7 +42,8 @@ public class ContactsSecurityTest {
     }
 
     HttpResponse<String> request(String method, String path, String token, String body) throws Exception {
-        var builder=HttpRequest.newBuilder(base.resolve(path)).header("Authorization","Bearer "+token);
+        var builder=HttpRequest.newBuilder(base.resolve(path));
+        if (token != null) builder.header("Authorization","Bearer "+token);
         builder.header("Content-Type","application/json");
         return HttpClient.newHttpClient().send(builder.method(method, body==null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body)).build(),HttpResponse.BodyHandlers.ofString());
     }
@@ -71,6 +72,28 @@ public class ContactsSecurityTest {
         assertEquals(403,status(OidcTestServer.token("no-role-user","unrelated")));
     }
     @Test void missingBearerTokenReturns401() throws Exception { assertEquals(401,status(null)); }
+    static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> endpointAccessCases() {
+        return java.util.stream.Stream.of(
+                "GET /api/v1/contacts", "GET /api/v1/contacts/999999",
+                "POST /api/v1/contacts", "PUT /api/v1/contacts/999999", "DELETE /api/v1/contacts/999999",
+                "GET /api/v1/groups", "GET /api/v1/groups/999999",
+                "POST /api/v1/groups", "PUT /api/v1/groups/999999", "DELETE /api/v1/groups/999999",
+                "GET /api/v1/groups/999999/contacts")
+                .flatMap(endpoint -> {
+                    String[] parts = endpoint.split(" ");
+                    return java.util.stream.Stream.of(
+                            org.junit.jupiter.params.provider.Arguments.of(parts[0], parts[1], null, 401),
+                            org.junit.jupiter.params.provider.Arguments.of(parts[0], parts[1], "unrelated", 403));
+                });
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("endpointAccessCases")
+    void everyEndpointRejectsMissingTokenOrApplicationRole(String method, String path, String role, int expected) throws Exception {
+        String token = role == null ? null : OidcTestServer.token("endpoint-access-user", role);
+        String body = path.startsWith("/api/v1/groups") ? "{\"name\":\"Access check\"}"
+                : "{\"firstName\":\"Access\",\"lastName\":\"Check\",\"email\":\"access-check@example.test\"}";
+        assertEquals(expected, request(method, path, token, body).statusCode());
+    }
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.CsvSource({"POST,/api/v1/groups","PUT,/api/v1/groups/999999","DELETE,/api/v1/groups/999999"})
     void ordinaryUserCannotPerformAdministratorGroupOperation(String method,String path) throws Exception {

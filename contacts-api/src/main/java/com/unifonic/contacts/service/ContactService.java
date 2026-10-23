@@ -9,7 +9,6 @@ import com.unifonic.contacts.repository.ContactGroupRepository;
 import com.unifonic.contacts.repository.ContactRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotAuthorizedException;
 import org.eclipse.microprofile.jwt.JsonWebToken;
@@ -19,7 +18,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @ApplicationScoped
-@RolesAllowed({"user", "admin"})
 public class ContactService {
 
 
@@ -159,7 +157,6 @@ public class ContactService {
     }
 
 
-    @RolesAllowed("admin")
     @Transactional
     public void delete(Long id) {
         currentSubject();
