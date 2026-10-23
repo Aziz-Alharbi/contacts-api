@@ -11,13 +11,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ContactCreatedConsumerTest {
+    io.micrometer.core.instrument.simple.SimpleMeterRegistry metrics;
     ContactCreatedConsumer consumer;
     Channel channel;
     ContactCreatedEvent event;
     GetResponse delivery;
 
     @BeforeEach void setup() throws Exception {
-        consumer = new ContactCreatedConsumer();
+        metrics = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        consumer = new ContactCreatedConsumer(); consumer.telemetry = new com.unifonic.events.EventTelemetry(metrics, io.opentelemetry.api.OpenTelemetry.noop());
         consumer.json = new ObjectMapper().findAndRegisterModules();
         consumer.handler = mock(ContactCreatedHandler.class);
         channel = mock(Channel.class);
@@ -35,6 +37,7 @@ class ContactCreatedConsumerTest {
         var order = inOrder(consumer.handler, channel);
         order.verify(consumer.handler).handle(event, 1);
         order.verify(channel).basicAck(7, false);
+        assertEquals(1, metrics.get("contacts.events").tags("operation", "process", "broker", "rabbitmq", "result", "success").counter().count());
         verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
     }
 

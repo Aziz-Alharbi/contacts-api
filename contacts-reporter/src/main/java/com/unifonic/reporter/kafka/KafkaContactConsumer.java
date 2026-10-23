@@ -15,6 +15,7 @@ import java.util.Properties;
 @ApplicationScoped
 public class KafkaContactConsumer {
     private static final Logger LOG = Logger.getLogger(KafkaContactConsumer.class);
+    @Inject EventTelemetry telemetry;
     @Inject KafkaSettings settings;
     @Inject ObjectMapper json;
     @ConfigProperty(name="contacts.kafka.enabled", defaultValue="true") boolean enabled;
@@ -43,7 +44,7 @@ public class KafkaContactConsumer {
         if (!enabled || streams != null) return;
         try {
             KafkaTopics.ensure(settings);
-            streams = new KafkaStreams(ContactEventTopology.build(settings.topic(), settings.countsTopic(), json),
+            streams = new KafkaStreams(ContactEventTopology.build(settings.topic(), settings.countsTopic(), json, telemetry),
                     streamProperties(settings, applicationId, stateDir));
             streams.setStateListener((next, previous) -> LOG.infof("kafka consumer state=%s previous=%s", next, previous));
             streams.setUncaughtExceptionHandler(failure -> {

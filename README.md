@@ -169,8 +169,16 @@ Run `mvn clean verify` to execute API/Reporter tests, generate per-module JaCoCo
 
 Pull requests targeting `main` run Java 21/Maven verification, preserve available test and coverage reports, and build both application images without publishing. Pushes to `main` repeat these checks and publish the verified images to GHCR with full commit SHA tags. See [CI/CD configuration, permissions, image verification and Green/Red evidence](docs/cicd.md). GitHub execution and publication still require the repository owner's review and normal delivery operations.
 
+## Kubernetes development environment
+
+The [Minikube guide](docs/kubernetes.md) runs only two API replicas in Kubernetes, with MySQL, Keycloak, RabbitMQ, Kafka and Reporter in Docker Compose. Use `compose.kubernetes.yaml` with the base Compose file for the shared network; the guide covers local Secrets, health checks, recovery and safe shutdown. This topology was verified locally with API 2/2, authenticated creation, both brokers, Reporter processing and Pod replacement. The guide records the existing Compose project/private runtime settings, preserved PVCs, resource limits and rollback procedure. Default Compose and CI remain unchanged.
+
 ## Identity and verification commands
 
 Java 21 / Quarkus command-mode utilities live in the existing Reporter module. Build their separate command package with `mvn -pl contacts-reporter package -Dquarkus.profile=tools -DskipTests`. See [identity/TOOLS.md](identity/TOOLS.md) for Device Authorization Flow with demo-user/demo-admin, service tokens, realm export sanitization. Review procedures for Git secrets, controlled defects, and real-service checks are in [docs/security-verification.md](docs/security-verification.md) and [docs/testing-and-coverage.md](docs/testing-and-coverage.md).
 
 Automated `mvn clean verify` tests run without external MySQL or Keycloak. For the complete system on a new machine, use `docker compose up --build` as documented above. For optional host execution, build the command package, create `.env` with `init-env`, start Keycloak using Compose, prepare MySQL and `DB_PASSWORD`, then start Contacts API and Contacts Reporter as documented above and in [contacts-reporter/README.md](contacts-reporter/README.md). Real-service verification is documented separately in [docs/security-verification.md](docs/security-verification.md).
+
+## Observability
+
+[Observability guide](docs/observability.md): Prometheus metrics, existing health probes, JSON event logs and optional OpenTelemetry tracing. A single optional Compose overlay provides Prometheus, one provisioned Grafana dashboard and Jaeger outside Kubernetes. The fixed-tag Java 21 images and additive Outbox migration were deployed locally; the guide records successful per-replica scraping, Grafana datasource checks and a connected API/Outbox/Reporter trace, together with backup, rollback and resource limits.

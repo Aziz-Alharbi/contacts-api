@@ -1,0 +1,101 @@
+{
+  "uid": "contacts-overview",
+  "title": "Contacts overview",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scrape availability",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "contacts-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"contacts-.*\"}",
+          "legendFormat": "{{job}} {{operation}} {{broker}} {{result}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "HTTP request rate",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "contacts-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (job) (rate(http_server_requests_seconds_count{job=~\"contacts-.*\"}[5m]))",
+          "legendFormat": "{{job}} {{operation}} {{broker}} {{result}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Event operation attempts",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "contacts-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (job, operation, broker, result) (rate(contacts_events_total[5m]))",
+          "legendFormat": "{{job}} {{operation}} {{broker}} {{result}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Pending Outbox snapshot",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "contacts-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (broker) (contacts_outbox_pending)",
+          "legendFormat": "{{job}} {{operation}} {{broker}} {{result}}"
+        }
+      ]
+    }
+  ]
+}

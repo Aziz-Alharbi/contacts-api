@@ -17,6 +17,8 @@ public class ContactOutbox {
     @Column(name = "contactId", nullable = false) public Long contactId;
     @Column(name = "occurredAt", nullable = false) public Instant occurredAt;
 
+    @Column(name = "traceParent", length = 55) public String traceParent;
+
     public ContactCreatedEvent event() {
         return new ContactCreatedEvent(eventId, correlationId, contactId, occurredAt);
     }

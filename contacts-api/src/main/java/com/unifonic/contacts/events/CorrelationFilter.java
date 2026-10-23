@@ -5,6 +5,7 @@ import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.container.*;
 import jakarta.ws.rs.ext.Provider;
 import java.util.UUID;
+import org.jboss.logging.MDC;
 
 @Provider
 @RequestScoped
@@ -26,9 +27,11 @@ public class CorrelationFilter implements ContainerRequestFilter, ContainerRespo
                 throw new BadRequestException("X-Correlation-ID must be a UUID");
             }
         }
+        MDC.put("correlationId", id().toString());
     }
 
     @Override public void filter(ContainerRequestContext request, ContainerResponseContext response) {
-        response.getHeaders().putSingle("X-Correlation-ID", id().toString());
+        try { response.getHeaders().putSingle("X-Correlation-ID", id().toString()); }
+        finally { MDC.remove("correlationId"); }
     }
 }

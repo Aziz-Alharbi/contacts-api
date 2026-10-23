@@ -53,7 +53,7 @@ class KafkaFlowTest {
         return records;
     }
     KafkaStreams start(KafkaSettings settings,String directory) {
-        var streams=new KafkaStreams(ContactEventTopology.build(settings.topic(),settings.countsTopic(),json),
+        var streams=new KafkaStreams(ContactEventTopology.build(settings.topic(),settings.countsTopic(),json,new com.unifonic.events.EventTelemetry(new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), io.opentelemetry.api.OpenTelemetry.noop())),
                 KafkaContactConsumer.streamProperties(settings,id,state.resolve(directory).toString()));
         streams.start(); return streams;
     }

@@ -15,6 +15,7 @@ import org.jboss.logging.Logger;
 @ApplicationScoped
 public class OutboxPublisher {
     private static final Logger LOG = Logger.getLogger(OutboxPublisher.class);
+    @Inject com.unifonic.events.EventTelemetry telemetry;
     @Inject EntityManager em;
     @Inject ObjectMapper json;
     @Inject RabbitPublisher publisher;
@@ -37,18 +38,23 @@ public class OutboxPublisher {
         var rows = em.createQuery("from ContactOutbox where " + pending + " = false order by sequenceNumber", ContactOutbox.class)
                 .setMaxResults(20).setLockMode(LockModeType.PESSIMISTIC_WRITE).getResultList();
         for (var row : rows) {
-            try {
-                String body = json.writeValueAsString(row.event());
-                if (rabbit) publisher.publish(row.event(), body);
-                else kafka.publish(row.event(), body);
-                if (rabbit) row.rabbitPublished = true;
-                else row.kafkaPublished = true;
-                published(row, broker);
-                if (row.rabbitPublished && row.kafkaPublished) em.remove(row);
-            } catch (Exception failure) {
-                deferred(row, broker, failure);
-                // Do not let later events overtake the failed event on this broker.
-                break;
+            try (var observation = telemetry.open(row.traceParent, row.event(), "contact-created publish " + broker, io.opentelemetry.api.trace.SpanKind.PRODUCER)) {
+                try {
+                    String body = json.writeValueAsString(row.event());
+                    if (rabbit) publisher.publish(row.event(), body);
+                    else kafka.publish(row.event(), body);
+                    if (rabbit) row.rabbitPublished = true;
+                    else row.kafkaPublished = true;
+                    telemetry.result("publish", broker, "success");
+                    published(row, broker);
+                    if (row.rabbitPublished && row.kafkaPublished) em.remove(row);
+                } catch (Exception failure) {
+                    observation.failed();
+                    telemetry.result("publish", broker, "failure");
+                    deferred(row, broker, failure);
+                    // Do not let later events overtake the failed event on this broker.
+                    break;
+                }
             }
         }
     }

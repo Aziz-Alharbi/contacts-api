@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: contacts-api-metrics
+  namespace: contacts-local
+  labels:
+    app.kubernetes.io/name: contacts-api
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: contacts-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

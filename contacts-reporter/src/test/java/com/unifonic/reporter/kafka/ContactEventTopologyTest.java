@@ -23,7 +23,7 @@ class ContactEventTopologyTest {
         properties.put(StreamsConfig.APPLICATION_ID_CONFIG,"topology-test");
         properties.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,"unused:9092");
         properties.put(StreamsConfig.STATE_DIR_CONFIG,state.toString());
-        driver = new TopologyTestDriver(ContactEventTopology.build("events","counts",json),properties);
+        driver = new TopologyTestDriver(ContactEventTopology.build("events","counts",json,new com.unifonic.events.EventTelemetry(new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), io.opentelemetry.api.OpenTelemetry.noop())),properties);
         input=driver.createInputTopic("events",new StringSerializer(),new StringSerializer());
         output=driver.createOutputTopic("counts",new StringDeserializer(),new StringDeserializer());
     }
@@ -54,5 +54,12 @@ class ContactEventTopologyTest {
         assertThrows(StreamsException.class,() -> input.pipeInput("43",json.writeValueAsString(event)));
         assertTrue(output.isEmpty());
         assertNull(driver.<String,Long>getKeyValueStore(ContactEventTopology.SEEN).get(event.eventId().toString()));
+    }    @Test void rejectedPayloadDoesNotEscapeThroughExceptionMessages() {
+        String marker = "sensitive-fixture-value";
+        var failure = assertThrows(StreamsException.class, () -> input.pipeInput("42", "{\"eventId\":\"" + marker + "\"}"));
+        for (Throwable cause = failure; cause != null; cause = cause.getCause())
+            assertFalse(String.valueOf(cause.getMessage()).contains(marker));
+        assertTrue(output.isEmpty());
     }
+
 }

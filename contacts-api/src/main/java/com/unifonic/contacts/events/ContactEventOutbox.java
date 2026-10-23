@@ -19,6 +19,7 @@ public class ContactEventOutbox {
         row.correlationId = correlation.id();
         row.contactId = contactId;
         row.occurredAt = Instant.now();
+        row.traceParent = com.unifonic.events.EventTelemetry.traceParent();
         em.persist(row);
     }
 }
