@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: contacts-settings
+  namespace: contacts-local
+  labels:
+    app.kubernetes.io/name: contacts-settings
+    app.kubernetes.io/part-of: contacts
+data:
+  DB_URL: jdbc:mysql://192.168.49.10:3306/contacts_db
+  DB_USERNAME: contacts
+  QUARKUS_OIDC_AUTH_SERVER_URL: http://192.168.49.11:8080/realms/contacts
+  QUARKUS_OIDC_DISCOVERY_ENABLED: 'false'
+  QUARKUS_OIDC_JWKS_PATH: protocol/openid-connect/certs
+  QUARKUS_OIDC_TOKEN_ISSUER: http://localhost:8081/realms/contacts
+  RABBITMQ_HOST: 192.168.49.12
+  RABBITMQ_PORT: '5672'
+  RABBITMQ_USERNAME: contacts
+  KAFKA_BOOTSTRAP_SERVERS: 192.168.49.13:19092
+  KAFKA_CONTACT_TOPIC: contacts.contact-created.v1
+  KAFKA_COUNTS_TOPIC: contacts.reporter.contact-counts.v1
+  KAFKA_PARTITIONS: '3'
+  KAFKA_REPLICATION_FACTOR: '1'
+  JAVA_OPTS: "-XX:MaxRAMPercentage=50"

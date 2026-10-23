@@ -1,0 +1,44 @@
+# Use with compose.yaml; the existing Minikube Docker network is external.
+# Confirm its subnet is 192.168.49.0/24 and addresses .10-.14 are unused.
+services:
+  local-secrets:
+    image: contacts-reporter:minikube-20261020
+  contacts-api:
+    profiles: [standalone-api]
+  mysql:
+    networks:
+      default:
+        ipv4_address: 192.168.49.10
+  keycloak:
+    networks:
+      default:
+        ipv4_address: 192.168.49.11
+  rabbitmq:
+    # Preserve this hostname when reusing an existing RabbitMQ data volume.
+    hostname: ${RABBITMQ_NODE_HOSTNAME:-rabbitmq}
+    networks:
+      default:
+        ipv4_address: 192.168.49.12
+  kafka:
+    networks:
+      default:
+        ipv4_address: 192.168.49.13
+  contacts-reporter:
+    image: contacts-reporter:observability-20261022
+    networks:
+      default:
+        ipv4_address: 192.168.49.14
+    environment:
+      CONTACTS_API_URL: http://host.docker.internal:18080
+      KEYCLOAK_URL: http://192.168.49.11:8080
+      RABBITMQ_HOST: 192.168.49.12
+      KAFKA_BOOTSTRAP_SERVERS: 192.168.49.13:19092
+    depends_on: !override
+      keycloak: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+
+networks:
+  default:
+    external: true
+    name: contacts-local

@@ -1,0 +1,89 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: contacts-api
+  namespace: contacts-local
+  labels:
+    app.kubernetes.io/name: contacts-api
+    app.kubernetes.io/part-of: contacts
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: contacts-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: contacts-api
+        app.kubernetes.io/part-of: contacts
+    spec:
+      automountServiceAccountToken: false
+      # Kafka metadata advertises its Compose network alias.
+      hostAliases:
+      - ip: 192.168.49.13
+        hostnames: [kafka]
+      containers:
+      - name: contacts-api
+        image: contacts-api:observability-20261022
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+        envFrom:
+        - configMapRef:
+            name: contacts-settings
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: contacts-credentials
+              key: mysql-app
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: contacts-credentials
+              key: rabbitmq
+        startupProbe:
+          httpGet:
+            path: "/q/health/live"
+            port: 8080
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: "/q/health/ready"
+            port: 8080
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: "/q/health/live"
+            port: 8080
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
