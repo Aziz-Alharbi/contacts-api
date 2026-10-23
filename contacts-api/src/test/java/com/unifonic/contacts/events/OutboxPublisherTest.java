@@ -15,7 +15,7 @@ class OutboxPublisherTest {
     ContactOutbox row;
     List<ContactOutbox> rows;
     @BeforeEach void setup() {
-        dispatcher = new OutboxPublisher(); dispatcher.enabled = true;
+        dispatcher = new OutboxPublisher(); dispatcher.enabled = true; dispatcher.telemetry = new com.unifonic.events.EventTelemetry(new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), io.opentelemetry.api.OpenTelemetry.noop());
         dispatcher.em = mock(EntityManager.class);
         dispatcher.publisher = mock(RabbitPublisher.class);
         dispatcher.kafka = mock(KafkaPublisher.class);

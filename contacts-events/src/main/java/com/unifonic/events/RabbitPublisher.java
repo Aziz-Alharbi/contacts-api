@@ -19,9 +19,12 @@ public class RabbitPublisher {
             channel.confirmSelect();
             AtomicBoolean returned = new AtomicBoolean();
             channel.addReturnListener(message -> returned.set(true));
+            var headers = new java.util.HashMap<String, Object>();
+            String parent = EventTelemetry.traceParent();
+            if (parent != null) headers.put("traceparent", parent);
             var properties = new AMQP.BasicProperties.Builder()
                     .contentType("application/json").contentEncoding("UTF-8").deliveryMode(2)
-                    .type("ContactCreatedEvent.v1").messageId(event.eventId().toString())
+                    .headers(headers).type("ContactCreatedEvent.v1").messageId(event.eventId().toString())
                     .correlationId(event.correlationId().toString()).build();
             channel.basicPublish(RabbitTopology.EXCHANGE, RabbitTopology.KEY, true, properties,
                     json.getBytes(StandardCharsets.UTF_8));

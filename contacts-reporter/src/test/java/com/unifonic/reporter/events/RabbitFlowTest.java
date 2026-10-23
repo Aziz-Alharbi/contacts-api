@@ -33,7 +33,7 @@ class RabbitFlowTest {
             assertEquals(3, inspection.messageCount(RabbitTopology.QUEUE));
             var handler = spy(new ContactCreatedHandler());
             handler.failEventId = Optional.of(poison.eventId());
-            var consumer = new ContactCreatedConsumer();
+            var consumer = new ContactCreatedConsumer(); consumer.telemetry = new com.unifonic.events.EventTelemetry(new io.micrometer.core.instrument.simple.SimpleMeterRegistry(), io.opentelemetry.api.OpenTelemetry.noop());
             consumer.enabled = true; consumer.broker = broker; consumer.json = json; consumer.handler = handler;
             consumer.poll();
             verify(handler).handle(first, 1);

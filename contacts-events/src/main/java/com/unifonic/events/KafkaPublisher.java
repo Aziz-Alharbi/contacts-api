@@ -27,6 +27,8 @@ public class KafkaPublisher {
         record.headers().add(new RecordHeader("eventId", event.eventId().toString().getBytes(StandardCharsets.UTF_8)));
         record.headers().add(new RecordHeader("correlationId", event.correlationId().toString().getBytes(StandardCharsets.UTF_8)));
         record.headers().add(new RecordHeader("type", "ContactCreatedEvent.v1".getBytes(StandardCharsets.UTF_8)));
+        String parent = EventTelemetry.traceParent();
+        if (parent != null) record.headers().add(new RecordHeader("traceparent", parent.getBytes(StandardCharsets.US_ASCII)));
         producer.send(record).get(12, TimeUnit.SECONDS);
     }
 
